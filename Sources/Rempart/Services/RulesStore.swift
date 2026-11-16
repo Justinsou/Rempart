@@ -36,7 +36,9 @@ final class RulesStore: ObservableObject {
     // MARK: Persistance
     private func load() {
         guard let data = try? Data(contentsOf: stateURL),
-              let s = try? JSONDecoder().decode(AppState.self, from: data) else { return }
+              var s = try? JSONDecoder().decode(AppState.self, from: data) else { return }
+        // Nettoie les anciens contacts ntfy (sans vrai numéro / e-mail).
+        s.contacts.removeAll { $0.handle.isEmpty || $0.handle.hasPrefix("rempart-") }
         state = s
     }
 
@@ -206,13 +208,17 @@ final class RulesStore: ObservableObject {
     var pendingRequests: [ApprovalRequest] { state.requests.filter { $0.status == .pending } }
 
     @discardableResult
-    func addContact(name: String) -> TrustedContact? {
+    func addContact(name: String, handle: String) -> TrustedContact? {
         let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !n.isEmpty else { return nil }
-        let slug = String(n.lowercased().filter { $0.isLetter || $0.isNumber }.prefix(10))
-        let rand = (0..<12).map { _ in "abcdefghijklmnopqrstuvwxyz0123456789".randomElement()! }
-        let c = TrustedContact(name: n, topic: "rempart-\(slug)-" + String(rand))
-        mutate { $0.contacts.append(c) }
+        let h = handle.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: " ", with: "")
+        guard !n.isEmpty, !h.isEmpty else { return nil }
+        // Ignore les anciens contacts ntfy (topic sans @ ni chiffre).
+        let c = TrustedContact(name: n, handle: h)
+        mutate {
+            $0.contacts.removeAll { $0.handle.isEmpty || $0.handle.hasPrefix("rempart-") }
+            $0.contacts.append(c)
+        }
         return c
     }
 

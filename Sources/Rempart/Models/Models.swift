@@ -30,11 +30,32 @@ struct JournalEntry: Codable, Identifiable, Hashable {
     var minutes: Int
 }
 
-/// Un proche qui peut approuver ou refuser une demande (via notification ntfy).
+/// Un proche qui peut approuver ou refuser une demande (via Messages).
 struct TrustedContact: Codable, Identifiable, Hashable {
     var id = UUID()
     var name: String
-    var topic: String
+    /// Numéro de téléphone ou e-mail iMessage.
+    var handle: String
+
+    // Ancien format (ntfy) → ignore le topic.
+    enum CodingKeys: String, CodingKey { case id, name, handle, topic }
+    init(id: UUID = UUID(), name: String, handle: String) {
+        self.id = id; self.name = name; self.handle = handle
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try c.decode(String.self, forKey: .name)
+        handle = try c.decodeIfPresent(String.self, forKey: .handle)
+            ?? c.decodeIfPresent(String.self, forKey: .topic)
+            ?? ""
+    }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(handle, forKey: .handle)
+    }
 }
 
 enum RequestStatus: String, Codable { case pending, approved, denied, expired }
@@ -42,6 +63,7 @@ enum RequestStatus: String, Codable { case pending, approved, denied, expired }
 struct ApprovalRequest: Codable, Identifiable, Hashable {
     var id = UUID()
     var contactName: String
+    /// Handle Messages du proche (réponses lues dans cette conversation).
     var replyTopic: String
     var items: [String]
     var minutes: Int
@@ -49,6 +71,7 @@ struct ApprovalRequest: Codable, Identifiable, Hashable {
     var created: Date
     var status: RequestStatus = .pending
     var grantedMinutes: Int?
+    var marker: String?
 }
 
 struct AppState: Codable {

@@ -39,7 +39,7 @@ cat > "$APP/Contents/Info.plist" <<'EOF'
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Rempart doit lire et rediriger les onglets de ton navigateur pour bloquer les sites que tu as choisis.</string>
+    <string>Rempart lit et redirige les onglets de ton navigateur, et envoie / lit des messages pour les demandes de déblocage à tes proches.</string>
 </dict>
 </plist>
 EOF

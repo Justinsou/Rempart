@@ -94,10 +94,10 @@ struct UnlockView: View {
                     message: friendMessage.trimmingCharacters(in: .whitespacesAndNewlines))
                 sending = false
                 if ok { sentTo = c.name; selected = []; friendMessage = "" }
-                else { sendError = "Impossible d'envoyer la notification. Vérifie ta connexion." }
+                else { sendError = "Impossible d'envoyer le message. Autorise Rempart à contrôler Messages, ou vérifie le numéro / e-mail." }
             }
         } label: {
-            Text(sending ? "Envoi…" : "Envoyer la demande")
+            Text(sending ? "Envoi…" : "Envoyer par Messages")
                 .font(.system(size: 16, weight: .bold, design: .rounded))
                 .frame(maxWidth: .infinity).padding(.vertical, 16)
                 .foregroundStyle(Color(red: 0.03, green: 0.12, blue: 0.2))
@@ -106,7 +106,8 @@ struct UnlockView: View {
         .buttonStyle(.plain).disabled(!canSendFriend)
         if let sendError { Banner(icon: "exclamationmark.triangle.fill", text: sendError, tint: .orange) }
         if let sentTo {
-            Banner(icon: "paperplane.fill", text: "Demande envoyée à \(sentTo). Tu seras débloqué dès qu'il approuve.")
+            Banner(icon: "bubble.left.and.bubble.right.fill",
+                   text: "Message envoyé à \(sentTo). Dès qu'il répond OUI, OUI15 ou NON, Rempart applique la décision.")
         }
     }
 

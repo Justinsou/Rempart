@@ -4,7 +4,9 @@ import AppKit
 struct CircleView: View {
     @EnvironmentObject var store: RulesStore
     @State private var name = ""
+    @State private var handle = ""
     @State private var feedback: [UUID: String] = [:]
+    @State private var formError: String?
 
     private let moods: [Mood] = [.happy, .sad, .angry, .sleepy]
 
@@ -12,20 +14,29 @@ struct CircleView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 PageHeader(title: "Proches",
-                           subtitle: "Des personnes de confiance qui décident si tu peux débloquer.",
+                           subtitle: "Ils reçoivent ta demande dans Messages et répondent OUI ou NON.",
                            mood: .happy)
 
                 Card {
                     Text("Comment ça marche").caption2Label()
-                    step(1, "Ajoute un proche ci-dessous (2 personnes max recommandé).")
-                    step(2, "Il installe l'app gratuite **ntfy** (iPhone ou Android), puis ouvre le lien que tu lui envoies.")
-                    step(3, "Quand tu demandes un déblocage, il reçoit une notification avec ton message et les boutons Approuver / Refuser.")
+                    step(1, "Ajoute un proche avec son numéro ou son e-mail iMessage.")
+                    step(2, "Quand tu demandes un déblocage, Rempart lui envoie un message.")
+                    step(3, "Il répond **OUI**, **OUI15** (15 min) ou **NON**. Rempart lit la réponse et débloque automatiquement.")
                 }
 
-                HStack(spacing: 12) {
-                    SearchField(text: $name, placeholder: "Prénom du proche", icon: "person.badge.plus", onSubmit: add)
-                    PillButton(title: "Ajouter", icon: "plus", action: add)
-                        .scaleEffect(1.1).padding(.horizontal, 6)
+                Card {
+                    Text("Nouveau proche").caption2Label()
+                    HStack(spacing: 12) {
+                        SearchField(text: $name, placeholder: "Prénom", icon: "person")
+                        SearchField(text: $handle, placeholder: "Numéro ou e-mail iMessage", icon: "phone", onSubmit: add)
+                    }
+                    if let formError {
+                        Text(formError).font(.caption).foregroundStyle(Color(red: 1, green: 0.45, blue: 0.5))
+                    }
+                    HStack {
+                        Spacer()
+                        PillButton(title: "Ajouter", icon: "plus", action: add)
+                    }
                 }
 
                 if store.contacts.isEmpty {
@@ -42,33 +53,14 @@ struct CircleView: View {
                             BlobView(mood: moods[i % moods.count], size: 52, glow: false, float: false)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(c.name).font(.system(size: 17, weight: .bold, design: .rounded))
-                                Text(ApprovalService.subscribeURL(for: c).absoluteString)
-                                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.muted)
-                                    .lineLimit(1).truncationMode(.middle)
+                                Text(c.handle).font(.system(size: 13, design: .rounded)).foregroundStyle(Theme.muted)
                             }
                             Spacer()
                         }
                         HStack(spacing: 8) {
-                            ShareLink(item: ApprovalService.subscribeURL(for: c),
-                                      message: Text("Installe l'app ntfy puis ouvre ce lien pour recevoir mes demandes de déblocage Rempart.")) {
-                                Label("Envoyer le lien", systemImage: "square.and.arrow.up")
-                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                    .padding(.horizontal, 14).padding(.vertical, 8)
-                                    .background(Theme.accent, in: Capsule())
-                                    .foregroundStyle(Color(red: 0.03, green: 0.12, blue: 0.2))
-                            }
-                            .buttonStyle(.plain)
-                            PillButton(title: "Copier", icon: "doc.on.doc", style: .subtle) {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(ApprovalService.subscribeURL(for: c).absoluteString, forType: .string)
-                                feedback[c.id] = "Lien copié"
-                            }
-                            PillButton(title: "Notification test", icon: "bell", style: .subtle) {
-                                feedback[c.id] = "Envoi…"
-                                Task {
-                                    let ok = await ApprovalService.shared.sendTest(to: c)
-                                    feedback[c.id] = ok ? "Test envoyé" : "Échec : vérifie ta connexion"
-                                }
+                            PillButton(title: "Message test", icon: "paperplane", style: .subtle) {
+                                feedback[c.id] = ApprovalService.shared.sendTest(to: c)
+                                    ? "Message ouvert / envoyé" : "Échec : autorise Rempart à contrôler Messages"
                             }
                             Spacer()
                             PillButton(title: "Retirer", icon: "trash", style: .danger) { store.removeContact(c) }
@@ -79,7 +71,8 @@ struct CircleView: View {
                     }
                 }
 
-                Banner(icon: "info.circle", text: "Les notifications passent par ntfy.sh. Le lien contient un code secret : ne le partage qu'avec la personne concernée.")
+                Banner(icon: "lock.rectangle",
+                       text: "Pour lire les réponses automatiquement, autorise Rempart dans Réglages → Confidentialité → Automatisation (Messages) et, si besoin, Accès complet au disque.")
             }
             .padding(.horizontal, 28).padding(.top, 40).padding(.bottom, 28)
         }
@@ -96,6 +89,11 @@ struct CircleView: View {
     }
 
     private func add() {
-        if store.addContact(name: name) != nil { name = "" }
+        formError = nil
+        if store.addContact(name: name, handle: handle) != nil {
+            name = ""; handle = ""
+        } else {
+            formError = "Indique un prénom et un numéro ou e-mail iMessage."
+        }
     }
 }
