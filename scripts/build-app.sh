@@ -47,11 +47,9 @@ EOF
 echo "→ Signature locale…"
 # Une identité stable garde les autorisations macOS (Accès complet au disque, Automatisation)
 # entre les recompilations. Sinon : signature ad hoc (les autorisations sont à refaire à chaque build).
-if security find-identity -p codesigning | grep -q "Rempart Local Signing"; then
-  codesign --force --deep -s "Rempart Local Signing" "$APP"
-else
-  codesign --force --deep -s - "$APP"
-fi
+SIGN_ID="Rempart Local Signing"
+security find-identity -p codesigning | grep -q "$SIGN_ID" || SIGN_ID="-"
+codesign --force --options runtime --entitlements scripts/Rempart.entitlements -s "$SIGN_ID" "$APP"
 
 if [ "$1" != "--no-install" ]; then
   echo "→ Installation dans /Applications…"

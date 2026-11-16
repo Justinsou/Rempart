@@ -34,10 +34,14 @@ enum HostsHelperInstaller {
     static func uninstall() -> Bool { runAdmin("uninstall") }
 
     private static func runAdmin(_ action: String) -> Bool {
-        guard let res = Bundle.main.resourcePath else { return false }
-        let cmd = "/bin/bash '\(res)/install-daemon.sh' \(action) '\(res)'"
-        let escaped = cmd.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-        let src = "do shell script \"\(escaped)\" with administrator privileges"
+        guard let res = Bundle.main.resourcePath,
+              res.hasPrefix("/Applications/") else { return false }   // jamais depuis un dossier modifiable (build/)
+        func esc(_ s: String) -> String {
+            s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        }
+        let src = """
+        do shell script "/bin/bash " & quoted form of "\(esc(res + "/install-daemon.sh"))" & " \(action) " & quoted form of "\(esc(res))" with administrator privileges
+        """
         var err: NSDictionary?
         NSAppleScript(source: src)?.executeAndReturnError(&err)
         RulesStore.shared.syncHosts()

@@ -15,7 +15,7 @@ final class AppBlocker {
             guard let app = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
             Task { @MainActor in self?.check(app) }
         }
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular {
                     self?.check(app)

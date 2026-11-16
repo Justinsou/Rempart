@@ -58,7 +58,7 @@ struct TrustedContact: Codable, Identifiable, Hashable {
     }
 }
 
-enum RequestStatus: String, Codable { case pending, approved, denied, expired }
+enum RequestStatus: String, Codable { case pending, approved, denied, expired, cancelled }
 
 struct ApprovalRequest: Codable, Identifiable, Hashable {
     var id = UUID()

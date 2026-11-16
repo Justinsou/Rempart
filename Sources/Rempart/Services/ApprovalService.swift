@@ -10,10 +10,57 @@ final class ApprovalService: ObservableObject {
     private var timer: Timer?
     private var checking = Set<UUID>()
 
-    func start() {
-        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.poll() }
+    func start() { refreshTimer() }
+
+    /// Le timer n'existe que s'il y a au moins une demande en attente.
+    func refreshTimer() {
+        let hasPending = !RulesStore.shared.pendingRequests.isEmpty
+        if hasPending, timer == nil {
+            timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+                Task { @MainActor in self?.poll() }
+            }
+        } else if !hasPending {
+            timer?.invalidate()
+            timer = nil
         }
+    }
+
+    /// Vérification manuelle d'une demande. Retourne un message pour l'utilisateur.
+    func checkNow(_ r: ApprovalRequest) -> String {
+        let store = RulesStore.shared
+        guard canReadMessages() else {
+            return "Accès refusé à Messages. Ajoute Rempart dans Accès complet au disque (puis relance l'app)."
+        }
+        guard let decision = findDecision(for: r) else {
+            return "Pas encore de réponse (OUI / OUI15 / NON) reçue de \(r.contactName)."
+        }
+        apply(decision, to: r, store: store)
+        refreshTimer()
+        switch decision {
+        case "deny": return "\(r.contactName) a refusé."
+        case "approve15": return "Approuvé (15 min max)."
+        default: return "Approuvé."
+        }
+    }
+
+    private func apply(_ decision: String, to r: ApprovalRequest, store: RulesStore) {
+        switch decision {
+        case "approve": store.resolveRequest(r.id, status: .approved, grantedMinutes: r.minutes)
+        case "approve15": store.resolveRequest(r.id, status: .approved, grantedMinutes: min(15, r.minutes))
+        case "deny": store.resolveRequest(r.id, status: .denied)
+        default: break
+        }
+    }
+
+    private func canReadMessages() -> Bool {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(NSHomeDirectory() + "/Library/Messages/chat.db", &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,
+              let db else { return false }
+        defer { sqlite3_close(db) }
+        var probe: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT 1 FROM message LIMIT 1", -1, &probe, nil) == SQLITE_OK else { return false }
+        sqlite3_finalize(probe)
+        return true
     }
 
     // MARK: Envoi
@@ -45,6 +92,7 @@ final class ApprovalService: ObservableObject {
             minutes: minutes, message: message, created: Date(),
             status: .pending, grantedMinutes: nil, marker: marker
         ))
+        refreshTimer()
         return true
     }
 
@@ -97,16 +145,10 @@ final class ApprovalService: ObservableObject {
         store.expireOldRequests()
         for r in store.pendingRequests where !checking.contains(r.id) {
             checking.insert(r.id)
-            if let decision = findDecision(for: r) {
-                switch decision {
-                case "approve": store.resolveRequest(r.id, status: .approved, grantedMinutes: r.minutes)
-                case "approve15": store.resolveRequest(r.id, status: .approved, grantedMinutes: min(15, r.minutes))
-                case "deny": store.resolveRequest(r.id, status: .denied)
-                default: break
-                }
-            }
+            if let decision = findDecision(for: r) { apply(decision, to: r, store: store) }
             checking.remove(r.id)
         }
+        refreshTimer()
     }
 
     /// Cherche une réponse OUI/NON après la date de la demande, dans Messages.
@@ -121,35 +163,6 @@ final class ApprovalService: ObservableObject {
         // Base SQLite de Messages (nécessite « Accès complet au disque »).
         // Seuls les messages reçus APRÈS la demande comptent.
         return decisionFromChatDB(handle: handle, since: since)
-    }
-
-    private func lastIncomingMessage(from handle: String) -> String? {
-        let h = handle.replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        let src = """
-        tell application "Messages"
-          try
-            set targetService to 1st account whose service type = iMessage
-            set theBuddy to participant "\(h)" of targetService
-            set chats to chats whose participants contains theBuddy
-            if (count of chats) is 0 then return ""
-            set theChat to item 1 of chats
-            set msgs to messages of theChat
-            if (count of msgs) is 0 then return ""
-            set lastMsg to item -1 of msgs
-            if direction of lastMsg is incoming then
-              return text of lastMsg as string
-            end if
-            return ""
-          on error
-            return ""
-          end try
-        end tell
-        """
-        var err: NSDictionary?
-        let result = NSAppleScript(source: src)?.executeAndReturnError(&err)
-        let s = result?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return s.isEmpty ? nil : s
     }
 
     private func decisionFromChatDB(handle: String, since: Int) -> String? {
@@ -210,45 +223,6 @@ final class ApprovalService: ObservableObject {
         if len == 0x81, i + 1 < bytes.count { len = Int(bytes[i]) | (Int(bytes[i + 1]) << 8); i += 2 }
         guard len > 0, i + len <= bytes.count else { return nil }
         return String(bytes: bytes[i..<i + len], encoding: .utf8)
-    }
-
-    // MARK: Diagnostic
-    /// Explique pourquoi une réponse est détectée ou non.
-    func diagnose(for contact: TrustedContact) -> String {
-        let path = NSHomeDirectory() + "/Library/Messages/chat.db"
-        var db: OpaquePointer?
-        let rc = sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nil)
-        defer { if let db { sqlite3_close(db) } }
-        guard rc == SQLITE_OK, let db else {
-            return "Accès refusé à Messages. Ajoute Rempart dans Accès complet au disque (puis relance l'app)."
-        }
-        var probe: OpaquePointer?
-        guard sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM message", -1, &probe, nil) == SQLITE_OK else {
-            return "Accès refusé à Messages. Ajoute Rempart dans Accès complet au disque (puis relance l'app)."
-        }
-        sqlite3_finalize(probe)
-
-        let handle = contact.handle.lowercased()
-            .replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "-", with: "")
-            .replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
-        let digits = handle.filter(\.isNumber)
-        let key = digits.count >= 7 ? String(digits) : handle
-        let sql = """
-        SELECT m.text, m.attributedBody, m.is_from_me FROM message m
-        JOIN handle h ON m.handle_id = h.ROWID
-        WHERE REPLACE(REPLACE(REPLACE(REPLACE(LOWER(h.id),' ',''),'-',''),'(',''),')','') LIKE '%' || ? || '%'
-        ORDER BY m.date DESC LIMIT 1;
-        """
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else { return "Accès OK mais lecture impossible." }
-        defer { sqlite3_finalize(stmt) }
-        key.withCString { _ = sqlite3_bind_text(stmt, 1, $0, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self)) }
-        guard sqlite3_step(stmt) == SQLITE_ROW else {
-            return "Accès OK, mais aucune conversation trouvée avec \(contact.handle). Vérifie le numéro / e-mail."
-        }
-        let text = Self.messageText(stmt) ?? "(illisible)"
-        let fromMe = sqlite3_column_int(stmt, 2) == 1
-        return "Accès OK. Dernier message \(fromMe ? "envoyé" : "reçu") : « \(text.prefix(60)) »"
     }
 
     private func parseDecision(_ raw: String) -> String? {

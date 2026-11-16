@@ -26,6 +26,7 @@ struct UnlockView: View {
     @State private var reason = ""
     @State private var countdown: Int?
     @State private var timer: Timer?
+    @State private var requestFeedback: [UUID: String] = [:]
     @State private var done = false
 
     @State private var mode = Mode.me
@@ -112,9 +113,15 @@ struct UnlockView: View {
     }
 
     @ViewBuilder private var requestsSection: some View {
-        let recent = Array(store.requests.prefix(5))
+        let recent = Array(store.requests.prefix(10))
         if !recent.isEmpty {
-            Text("Demandes à tes proches").caption2Label().padding(.top, 6)
+            HStack {
+                Text("Demandes à tes proches").caption2Label()
+                Spacer()
+                if recent.contains(where: { $0.status != .pending }) {
+                    PillButton(title: "Tout supprimer", icon: "trash", style: .danger) { store.deleteFinishedRequests() }
+                }
+            }.padding(.top, 6)
             ForEach(recent) { r in
                 Card {
                     HStack {
@@ -125,6 +132,20 @@ struct UnlockView: View {
                         }
                         Spacer()
                         statusPill(r)
+                    }
+                    HStack(spacing: 8) {
+                        if r.status == .pending {
+                            PillButton(title: "Vérifier la réponse", icon: "arrow.clockwise", style: .subtle) {
+                                requestFeedback[r.id] = ApprovalService.shared.checkNow(r)
+                            }
+                            PillButton(title: "Annuler", icon: "xmark", style: .danger) { store.cancelRequest(r.id) }
+                        } else {
+                            PillButton(title: "Supprimer", icon: "trash", style: .danger) { store.deleteRequest(r.id) }
+                        }
+                        Spacer()
+                    }
+                    if let f = requestFeedback[r.id], r.status == .pending {
+                        Text(f).font(.caption).foregroundStyle(Theme.accent)
                     }
                 }
             }
@@ -137,6 +158,7 @@ struct UnlockView: View {
         case .approved: ("Approuvé · \(r.grantedMinutes ?? r.minutes) min", Theme.accent)
         case .denied: ("Refusé", Color(red: 1, green: 0.45, blue: 0.5))
         case .expired: ("Expirée", Theme.muted)
+        case .cancelled: ("Annulée", Theme.muted)
         }
         Text(text).font(.system(size: 12, weight: .bold, design: .rounded))
             .padding(.horizontal, 10).padding(.vertical, 5)

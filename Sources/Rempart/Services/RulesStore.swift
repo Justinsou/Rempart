@@ -25,11 +25,22 @@ final class RulesStore: ObservableObject {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         supportDir = base.appendingPathComponent("Rempart", isDirectory: true)
         stateURL = supportDir.appendingPathComponent("state.json")
-        try? FileManager.default.createDirectory(at: supportDir, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: supportDir, withIntermediateDirectories: true,
+                                                 attributes: [.posixPermissions: 0o700])
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: supportDir.path)
         load()
         syncHosts()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tick() }
+        updateTimer()
+    }
+
+    /// Le timer d'1 s n'existe que tant qu'un déblocage est actif.
+    private func updateTimer() {
+        if state.sessions.isEmpty {
+            timer?.invalidate(); timer = nil
+        } else if timer == nil {
+            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+                Task { @MainActor in self?.tick() }
+            }
         }
     }
 
@@ -45,13 +56,18 @@ final class RulesStore: ObservableObject {
     private func save() {
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .deferredToDate
-        if let data = try? enc.encode(state) { try? data.write(to: stateURL, options: .atomic) }
+        if let data = try? enc.encode(state) {
+            try? data.write(to: stateURL, options: .atomic)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: stateURL.path)
+        }
     }
 
     private func mutate(_ f: (inout AppState) -> Void) {
+        now = Date()
         f(&state)
         save()
         syncHosts()
+        updateTimer()
     }
 
     private func tick() {
@@ -157,6 +173,7 @@ final class RulesStore: ObservableObject {
     }()
 
     func recordBlock() {
+        now = Date()
         let k = Self.dayFormatter.string(from: Date())
         state.blockCounts[k, default: 0] += 1
         save()
@@ -237,6 +254,19 @@ final class RulesStore: ObservableObject {
         if status == .approved, let m = grantedMinutes {
             addUnlock(items: r.items, minutes: m, reason: "Approuvé par \(r.contactName) — « \(r.message) »")
         }
+    }
+
+    func cancelRequest(_ id: UUID) {
+        resolveRequest(id, status: .cancelled)
+        ApprovalService.shared.refreshTimer()
+    }
+
+    func deleteRequest(_ id: UUID) {
+        mutate { $0.requests.removeAll { $0.id == id && $0.status != .pending } }
+    }
+
+    func deleteFinishedRequests() {
+        mutate { $0.requests.removeAll { $0.status != .pending } }
     }
 
     func expireOldRequests() {

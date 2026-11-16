@@ -21,9 +21,10 @@ case "$ACTION" in
     launchctl bootout system "$PLIST" 2>/dev/null || true
     rm -f "$PLIST"
     rm -rf "$DEST"
-    awk -v b="# >>> REMPART BEGIN" -v e="# <<< REMPART END" '$0==b{s=1;next} $0==e{s=0;next} !s{print}' /etc/hosts > /tmp/rempart-hosts.clean
-    cat /tmp/rempart-hosts.clean > /etc/hosts
-    rm -f /tmp/rempart-hosts.clean
+    CLEAN=$(mktemp /tmp/rempart-hosts.XXXXXX)
+    awk -v b="# >>> REMPART BEGIN" -v e="# <<< REMPART END" '$0==b{s=1;next} $0==e{s=0;next} !s{print}' /etc/hosts > "$CLEAN"
+    cat "$CLEAN" > /etc/hosts
+    rm -f "$CLEAN"
     dscacheutil -flushcache; killall -HUP mDNSResponder 2>/dev/null || true
     ;;
 esac

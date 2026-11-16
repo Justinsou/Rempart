@@ -62,9 +62,6 @@ struct CircleView: View {
                                 feedback[c.id] = ApprovalService.shared.sendTest(to: c)
                                     ? "Message ouvert / envoyé" : "Échec : autorise Rempart à contrôler Messages"
                             }
-                            PillButton(title: "Vérifier la lecture des réponses", icon: "stethoscope", style: .subtle) {
-                                feedback[c.id] = ApprovalService.shared.diagnose(for: c)
-                            }
                             Spacer()
                             PillButton(title: "Retirer", icon: "trash", style: .danger) { store.removeContact(c) }
                         }

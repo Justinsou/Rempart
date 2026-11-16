@@ -1,5 +1,5 @@
 #!/bin/bash
-# REMPART_DAEMON_VERSION=2
+# REMPART_DAEMON_VERSION=3
 # Service système Rempart (root) :
 #  1. maintient la section Rempart de /etc/hosts (sites bloqués)
 #  2. ferme les apps bloquées, même si l'app Rempart est quittée
@@ -51,7 +51,9 @@ kill_apps() {
     [[ "$until" =~ $NUM_RE ]] || continue
     [[ "$path" == /*.app ]] || continue
     case "$path" in
-      */Rempart.app|*/Finder.app|*/System\ Settings.app) continue ;;
+      *..*|*/Rempart.app|*/Finder.app|*/System\ Settings.app) continue ;;
+      /Applications/*.app|/System/Applications/*.app|/Users/*/Applications/*.app) ;;
+      *) continue ;;
     esac
     [ "$until" -gt "$now" ] && continue
     for pid in $(printf "%s\n" "$procs" | awk -v p="$path/Contents/" 'index($0,p)>0 {print $1}'); do
