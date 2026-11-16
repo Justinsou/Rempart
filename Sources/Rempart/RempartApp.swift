@@ -40,6 +40,7 @@ enum Tab: String, CaseIterable, Identifiable {
 final class AppRouter: ObservableObject {
     static let shared = AppRouter()
     @Published var tab: Tab = .dashboard
+    @Published var preselect: Set<String> = []
     var openWindow: (() -> Void)?
 
     func showMain(tab: Tab) {

@@ -19,7 +19,10 @@ struct OnboardingView: View {
                     Text("Rempart bloque tes apps et sites distrayants en permanence. Tu peux les débloquer temporairement en écrivant une vraie raison.")
                         .multilineTextAlignment(.center).foregroundStyle(.secondary)
                 case 1:
-                    List(apps) { AppRow(app: $0) }.frame(height: 300)
+                    ScrollView {
+                        LazyVStack(spacing: 8) { ForEach(apps) { AppRow(app: $0) } }
+                    }
+                    .frame(height: 300).scrollIndicators(.hidden)
                 case 2:
                     SuggestionChips().frame(maxWidth: .infinity, alignment: .leading)
                     Text("Tu pourras en ajouter d'autres ensuite.").font(.caption).foregroundStyle(.secondary)

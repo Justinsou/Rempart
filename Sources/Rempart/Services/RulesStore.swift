@@ -63,11 +63,16 @@ final class RulesStore: ObservableObject {
     func isAppListed(_ id: String) -> Bool { state.apps.contains { $0.bundleID == id } }
     func isSiteListed(_ d: String) -> Bool { state.sites.contains { $0.domain == d } }
 
-    func toggleApp(_ app: BlockedApp) {
-        mutate {
-            if let i = $0.apps.firstIndex(where: { $0.bundleID == app.bundleID }) { $0.apps.remove(at: i) }
-            else { $0.apps.append(app) }
+    /// Ajoute toujours ; retire seulement si autorisé. Retourne false si refusé.
+    @discardableResult
+    func toggleApp(_ app: BlockedApp) -> Bool {
+        if let i = state.apps.firstIndex(where: { $0.bundleID == app.bundleID }) {
+            guard canRemoveApp(app.bundleID) else { return false }
+            mutate { $0.apps.remove(at: i) }
+        } else {
+            mutate { $0.apps.append(app) }
         }
+        return true
     }
 
     @discardableResult
@@ -77,7 +82,12 @@ final class RulesStore: ObservableObject {
         return true
     }
 
-    func removeSite(_ s: BlockedSite) { mutate { $0.sites.removeAll { $0.domain == s.domain } } }
+    @discardableResult
+    func removeSite(_ s: BlockedSite) -> Bool {
+        guard canRemoveSite(s.domain) else { return false }
+        mutate { $0.sites.removeAll { $0.domain == s.domain } }
+        return true
+    }
 
     static func normalize(_ raw: String) -> String? {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -94,6 +104,13 @@ final class RulesStore: ObservableObject {
         state.sessions.filter { $0.items.contains(key) && $0.start <= now && $0.end > now }
             .map(\.end).max()
     }
+
+    /// Retirer un élément n'est permis que s'il est débloqué en ce moment
+    /// (ou pendant la configuration initiale).
+    func isAppUnlockedNow(_ bundleID: String) -> Bool { unlockEnd(for: "app:" + bundleID) != nil }
+    func isSiteUnlockedNow(_ domain: String) -> Bool { unlockEnd(for: "site:" + domain) != nil }
+    func canRemoveApp(_ id: String) -> Bool { !state.onboarded || isAppUnlockedNow(id) }
+    func canRemoveSite(_ domain: String) -> Bool { !state.onboarded || isSiteUnlockedNow(domain) }
 
     func isAppBlocked(_ bundleID: String) -> Bool {
         guard isAppListed(bundleID) else { return false }
