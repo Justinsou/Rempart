@@ -4,27 +4,47 @@ import AppKit
 let out = CommandLine.arguments[1]
 try? FileManager.default.createDirectory(atPath: out, withIntermediateDirectories: true)
 
+func blobPath(center c: CGPoint, radius r: CGFloat) -> NSBezierPath {
+    let p = NSBezierPath()
+    for i in 0...240 {
+        let t = Double(i) / 240 * 2 * .pi
+        let rad = r * (0.95 + 0.05 * CGFloat(cos(8 * t)))
+        let pt = CGPoint(x: c.x + rad * CGFloat(cos(t)), y: c.y + rad * CGFloat(sin(t)))
+        if i == 0 { p.move(to: pt) } else { p.line(to: pt) }
+    }
+    p.close()
+    return p
+}
+
 func render(_ px: Int) -> Data {
     let s = CGFloat(px)
     let img = NSImage(size: NSSize(width: s, height: s))
     img.lockFocus()
     let rect = NSRect(x: s * 0.06, y: s * 0.06, width: s * 0.88, height: s * 0.88)
-    let path = NSBezierPath(roundedRect: rect, xRadius: s * 0.2, yRadius: s * 0.2)
-    NSGradient(starting: NSColor(red: 0.30, green: 0.55, blue: 0.48, alpha: 1),
-               ending: NSColor(red: 0.25, green: 0.38, blue: 0.62, alpha: 1))!.draw(in: path, angle: -45)
-    let cfg = NSImage.SymbolConfiguration(pointSize: s * 0.5, weight: .semibold)
-    if let sym = NSImage(systemSymbolName: "shield.lefthalf.filled", accessibilityDescription: nil)?
-        .withSymbolConfiguration(cfg) {
-        let tinted = NSImage(size: sym.size)
-        tinted.lockFocus()
-        sym.draw(at: .zero, from: .zero, operation: .sourceOver, fraction: 1)
-        NSColor.white.set()
-        NSRect(origin: .zero, size: sym.size).fill(using: .sourceIn)
-        tinted.unlockFocus()
-        let r = NSRect(x: (s - tinted.size.width) / 2, y: (s - tinted.size.height) / 2,
-                       width: tinted.size.width, height: tinted.size.height)
-        tinted.draw(in: r)
+    let bg = NSBezierPath(roundedRect: rect, xRadius: s * 0.2, yRadius: s * 0.2)
+    NSColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1).setFill()
+    bg.fill()
+
+    let c = CGPoint(x: s / 2, y: s / 2)
+    let blob = blobPath(center: c, radius: s * 0.32)
+    NSGradient(colors: [NSColor(red: 0.04, green: 0.57, blue: 0.86, alpha: 1),
+                        NSColor(red: 0.42, green: 0.78, blue: 0.96, alpha: 1)])!
+        .draw(in: blob, relativeCenterPosition: .zero)
+
+    let ink = NSColor(red: 0.10, green: 0.20, blue: 0.40, alpha: 1)
+    ink.setFill()
+    for dx in [-0.13, 0.13] {
+        NSBezierPath(ovalIn: NSRect(x: c.x + s * dx - s * 0.03, y: c.y + s * 0.02, width: s * 0.06, height: s * 0.06)).fill()
     }
+    let smile = NSBezierPath()
+    smile.move(to: CGPoint(x: c.x - s * 0.06, y: c.y - s * 0.07))
+    smile.curve(to: CGPoint(x: c.x + s * 0.06, y: c.y - s * 0.07),
+                controlPoint1: CGPoint(x: c.x - s * 0.03, y: c.y - s * 0.12),
+                controlPoint2: CGPoint(x: c.x + s * 0.03, y: c.y - s * 0.12))
+    smile.lineWidth = s * 0.022
+    smile.lineCapStyle = .round
+    ink.setStroke()
+    smile.stroke()
     img.unlockFocus()
     let rep = NSBitmapImageRep(data: img.tiffRepresentation!)!
     return rep.representation(using: .png, properties: [:])!

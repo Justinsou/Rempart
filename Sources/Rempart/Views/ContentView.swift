@@ -1,24 +1,22 @@
 import SwiftUI
 
+extension View {
+    func screenTitle() -> some View {
+        font(.system(size: 32, weight: .bold, design: .rounded))
+    }
+    func caption2Label() -> some View {
+        font(.system(size: 11, weight: .semibold, design: .rounded)).textCase(.uppercase)
+            .tracking(0.8).foregroundStyle(Theme.muted)
+    }
+}
+
 struct ContentView: View {
     @EnvironmentObject var store: RulesStore
     @EnvironmentObject var router: AppRouter
 
     var body: some View {
-        NavigationSplitView {
-            List(Tab.allCases, selection: Binding(get: { router.tab }, set: { router.tab = $0 ?? .dashboard })) { tab in
-                Label(tab.title, systemImage: tab.icon).tag(tab)
-            }
-            .navigationSplitViewColumnWidth(min: 190, ideal: 210)
-            .safeAreaInset(edge: .top) {
-                HStack(spacing: 8) {
-                    Image(systemName: "shield.lefthalf.filled").foregroundStyle(Theme.gradient)
-                    Text("Rempart").font(.title3.weight(.bold))
-                    Spacer()
-                }
-                .padding(.horizontal, 16).padding(.top, 8)
-            }
-        } detail: {
+        HStack(spacing: 0) {
+            Sidebar()
             Group {
                 switch router.tab {
                 case .dashboard: DashboardView()
@@ -30,20 +28,107 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .background(Theme.bg.ignoresSafeArea())
+        .preferredColorScheme(.dark)
         .sheet(isPresented: Binding(get: { !store.onboarded }, set: { _ in })) {
             OnboardingView().environmentObject(store).interactiveDismissDisabled()
         }
     }
 }
 
+struct Sidebar: View {
+    @EnvironmentObject var router: AppRouter
+    @EnvironmentObject var store: RulesStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                BlobView(mood: .calm, size: 34, glow: false, float: false)
+                Text("Rempart").font(.system(size: 20, weight: .bold, design: .rounded))
+            }
+            .padding(.top, 44).padding(.bottom, 22).padding(.horizontal, 6)
+
+            ForEach(Tab.allCases) { tab in
+                let on = router.tab == tab
+                Button { withAnimation(.snappy(duration: 0.2)) { router.tab = tab } } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: tab.icon).frame(width: 20)
+                            .foregroundStyle(on ? Theme.accent : Theme.muted)
+                        Text(tab.title).font(.system(size: 14, weight: on ? .semibold : .medium, design: .rounded))
+                            .foregroundStyle(on ? .white : Theme.muted)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 10)
+                    .background(on ? Theme.card : .clear, in: RoundedRectangle(cornerRadius: 14))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+            HStack(spacing: 8) {
+                Circle().fill(store.activeSessions.isEmpty ? Theme.accent : Mood.happy.center).frame(width: 8, height: 8)
+                Text(store.activeSessions.isEmpty ? "Protégé" : "Débloqué").font(.caption.weight(.medium))
+                    .foregroundStyle(Theme.muted)
+            }
+            .padding(12)
+        }
+        .padding(.horizontal, 14).padding(.bottom, 14)
+        .frame(width: 220)
+        .background(Theme.sidebar)
+    }
+}
+
 struct Card<Content: View>: View {
     @ViewBuilder var content: Content
     var body: some View {
-        content
-            .padding(18)
+        VStack(alignment: .leading, spacing: 8) { content }
+            .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.quaternary))
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 24))
+    }
+}
+
+struct StatTile: View {
+    let label: String
+    let value: String
+    let mood: Mood
+    var body: some View {
+        Card {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(label).caption2Label()
+                    Text(value).font(.system(size: 40, weight: .bold, design: .rounded))
+                }
+                Spacer()
+                BlobView(mood: mood, size: 46, glow: false, float: false)
+            }
+        }
+    }
+}
+
+struct WeekChart: View {
+    @EnvironmentObject var store: RulesStore
+    var body: some View {
+        let data = store.lastDays(7)
+        let maxV = max(1, data.map(\.count).max() ?? 1)
+        Card {
+            Text("Blocages · 7 jours").caption2Label()
+            HStack(alignment: .bottom, spacing: 12) {
+                ForEach(Array(data.enumerated()), id: \.offset) { i, d in
+                    VStack(spacing: 8) {
+                        ZStack(alignment: .bottom) {
+                            Capsule().fill(Theme.bg).frame(width: 22, height: 110)
+                            Capsule()
+                                .fill(i == data.count - 1 ? AnyShapeStyle(Theme.gradient) : AnyShapeStyle(Theme.accent.opacity(0.35)))
+                                .frame(width: 22, height: max(8, 110 * CGFloat(d.count) / CGFloat(maxV)))
+                        }
+                        Text(d.label).font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Theme.muted)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.top, 6)
+        }
     }
 }
 
@@ -52,53 +137,56 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(spacing: 18) {
                 let protectedNow = store.activeSessions.isEmpty
-                HStack(spacing: 16) {
-                    Image(systemName: protectedNow ? "checkmark.shield.fill" : "shield.slash")
-                        .font(.system(size: 44)).foregroundStyle(.white)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(protectedNow ? "Protégé" : "Déblocage en cours").font(.largeTitle.bold())
-                        Text("\(store.apps.count) app\(store.apps.count > 1 ? "s" : "") et \(store.sites.count) site\(store.sites.count > 1 ? "s" : "") sous surveillance")
-                            .foregroundStyle(.white.opacity(0.85))
+                ZStack {
+                    RoundedRectangle(cornerRadius: 32).fill(Theme.card)
+                    RadialGradient(colors: [(protectedNow ? Mood.calm.center : Mood.happy.center).opacity(0.28), .clear],
+                                   center: .center, startRadius: 10, endRadius: 260)
+                        .clipShape(RoundedRectangle(cornerRadius: 32))
+                    VStack(spacing: 16) {
+                        BlobView(mood: protectedNow ? .calm : .happy, size: 150)
+                            .padding(.top, 22)
+                        Text(protectedNow ? "Rempart veille sur toi" : "Déblocage en cours")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                        Text("\(store.apps.count) app\(store.apps.count > 1 ? "s" : "") · \(store.sites.count) site\(store.sites.count > 1 ? "s" : "") sous surveillance")
+                            .foregroundStyle(Theme.muted)
+                            .padding(.bottom, 24)
                     }
-                    Spacer()
                 }
-                .foregroundStyle(.white)
-                .padding(24)
-                .background(Theme.gradient, in: RoundedRectangle(cornerRadius: 20))
 
                 HStack(spacing: 14) {
-                    Card {
-                        Label("Blocages aujourd'hui", systemImage: "hand.raised").foregroundStyle(.secondary)
-                        Text("\(store.blocksToday)").font(.system(size: 40, weight: .bold, design: .rounded))
-                    }
-                    Card {
-                        Label("Déblocages actifs", systemImage: "timer").foregroundStyle(.secondary)
-                        Text("\(store.activeSessions.count)").font(.system(size: 40, weight: .bold, design: .rounded))
-                    }
+                    StatTile(label: "Blocages aujourd'hui", value: "\(store.blocksToday)", mood: .angry)
+                    StatTile(label: "Déblocages actifs", value: "\(store.activeSessions.count)", mood: .happy)
                 }
+                HStack(spacing: 14) {
+                    StatTile(label: "Apps bloquées", value: "\(store.apps.count)", mood: .sad)
+                    StatTile(label: "Sites bloqués", value: "\(store.sites.count)", mood: .sleepy)
+                }
+                WeekChart()
 
                 if !store.activeSessions.isEmpty {
-                    Text("En cours").font(.headline)
+                    HStack { Text("En cours").caption2Label(); Spacer() }.padding(.top, 6)
                     ForEach(store.activeSessions) { s in
                         Card {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(s.items.map(store.name(for:)).joined(separator: ", ")).font(.headline)
-                                    Text(s.reason).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+                                    Text(s.items.map(store.name(for:)).joined(separator: ", "))
+                                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                    Text(s.reason).font(.callout).foregroundStyle(Theme.muted).lineLimit(2)
                                 }
                                 Spacer()
-                                VStack(alignment: .trailing) {
-                                    Text(remaining(s)).font(.title3.monospacedDigit().bold())
-                                    Button("Re-bloquer") { store.endSession(s) }.buttonStyle(.link)
+                                VStack(alignment: .trailing, spacing: 6) {
+                                    Text(remaining(s)).font(.system(size: 22, weight: .bold, design: .rounded).monospacedDigit())
+                                    Button("Re-bloquer") { store.endSession(s) }
+                                        .buttonStyle(.plain).foregroundStyle(Theme.accent).font(.callout.weight(.medium))
                                 }
                             }
                         }
                     }
                 }
             }
-            .padding(28)
+            .padding(.horizontal, 28).padding(.top, 40).padding(.bottom, 28)
         }
     }
 
@@ -120,36 +208,41 @@ struct JournalView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Journal").font(.largeTitle.bold())
+                Text("Journal").screenTitle()
                 Spacer()
-                Toggle("Filtrer par date", isOn: $filter).toggleStyle(.switch)
+                Toggle("Filtrer par date", isOn: $filter).toggleStyle(.switch).tint(Theme.accent)
                 if filter {
                     DatePicker("", selection: Binding(get: { day ?? Date() }, set: { day = $0 }), displayedComponents: .date)
                         .labelsHidden()
                 }
             }
             if entries.isEmpty {
-                ContentUnavailableView("Aucune entrée", systemImage: "book.closed",
-                                       description: Text("Tes justifications de déblocage apparaîtront ici."))
+                VStack(spacing: 14) {
+                    BlobView(mood: .sleepy, size: 110)
+                    Text("Rien à signaler").font(.system(size: 20, weight: .semibold, design: .rounded))
+                    Text("Tes justifications de déblocage apparaîtront ici.").foregroundStyle(Theme.muted)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    VStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         ForEach(entries) { e in
                             Card {
                                 HStack {
-                                    Text(e.itemNames.joined(separator: ", ")).font(.headline)
+                                    Text(e.itemNames.joined(separator: ", "))
+                                        .font(.system(size: 16, weight: .semibold, design: .rounded))
                                     Spacer()
-                                    Text("\(e.minutes) min").foregroundStyle(.secondary)
+                                    Text("\(e.minutes) min").foregroundStyle(Theme.accent).font(.callout.weight(.semibold))
                                 }
                                 Text(e.reason)
                                 Text(e.date.formatted(date: .complete, time: .shortened))
-                                    .font(.caption).foregroundStyle(.secondary)
+                                    .font(.caption).foregroundStyle(Theme.muted)
                             }
                         }
                     }
                 }
             }
         }
-        .padding(28)
+        .padding(.horizontal, 28).padding(.top, 40).padding(.bottom, 28)
     }
 }

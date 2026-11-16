@@ -2,8 +2,12 @@ import SwiftUI
 import AppKit
 
 enum Theme {
-    static let accent = Color(red: 0.30, green: 0.55, blue: 0.48)
-    static let accent2 = Color(red: 0.25, green: 0.38, blue: 0.62)
+    static let bg = Color(red: 0.07, green: 0.07, blue: 0.08)
+    static let sidebar = Color(red: 0.055, green: 0.055, blue: 0.065)
+    static let card = Color(red: 0.115, green: 0.115, blue: 0.13)
+    static let muted = Color(white: 0.55)
+    static let accent = Color(red: 0.30, green: 0.70, blue: 0.97)
+    static let accent2 = Color(red: 0.04, green: 0.50, blue: 0.86)
     static var gradient: LinearGradient {
         LinearGradient(colors: [accent, accent2], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
@@ -51,6 +55,7 @@ final class AppRouter: ObservableObject {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.appearance = NSAppearance(named: .darkAqua)
         MainActor.assumeIsolated {
             _ = RulesStore.shared
             AppBlocker.shared.start()

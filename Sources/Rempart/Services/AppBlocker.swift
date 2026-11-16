@@ -73,27 +73,30 @@ struct BlockOverlayView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            ZStack {
-                if let icon { Image(nsImage: icon).resizable().frame(width: 64, height: 64).opacity(0.9) }
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 22, weight: .bold)).foregroundStyle(.white)
-                    .padding(8).background(Theme.accent, in: Circle())
-                    .offset(x: 26, y: 26)
+            ZStack(alignment: .bottomTrailing) {
+                BlobView(mood: .angry, size: 110)
+                if let icon {
+                    Image(nsImage: icon).resizable().frame(width: 40, height: 40)
+                        .shadow(radius: 6).offset(x: 14, y: 10)
+                }
             }
-            .padding(.top, 20)
-            Text("\(title) est bloqué").font(.title2.weight(.semibold))
+            .padding(.top, 26)
+            Text("\(title) est bloqué")
+                .font(.system(size: 22, weight: .bold, design: .rounded))
             Text("Rempart protège ton temps. Si tu as une vraie raison, explique-la pour débloquer temporairement.")
-                .multilineTextAlignment(.center).foregroundStyle(.secondary)
-                .padding(.horizontal, 24)
+                .multilineTextAlignment(.center).foregroundStyle(Theme.muted)
+                .padding(.horizontal, 28)
             Spacer(minLength: 0)
             HStack {
-                Button("Compris", action: dismiss).keyboardShortcut(.cancelAction)
+                Button("Compris", action: dismiss).keyboardShortcut(.cancelAction).buttonStyle(.bordered)
                 Button("Demander un déblocage", action: unlock)
                     .buttonStyle(.borderedProminent).tint(Theme.accent)
             }
-            .padding(.bottom, 24)
+            .controlSize(.large)
+            .padding(.bottom, 26)
         }
-        .frame(width: 420, height: 340)
-        .background(.ultraThinMaterial)
+        .frame(width: 420, height: 360)
+        .background(Theme.bg)
+        .preferredColorScheme(.dark)
     }
 }

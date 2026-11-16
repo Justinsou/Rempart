@@ -29,7 +29,7 @@ struct UnlockView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Text("Débloquer").font(.largeTitle.bold())
+                Text("Débloquer").screenTitle()
                 Text("Explique pourquoi tu en as besoin. Ton texte est gardé dans le journal.")
                     .foregroundStyle(.secondary)
 
@@ -47,7 +47,7 @@ struct UnlockView: View {
                                 } label: {
                                     Label(it.name, systemImage: on ? "checkmark.circle.fill" : "circle")
                                         .padding(.horizontal, 12).padding(.vertical, 6)
-                                        .background(on ? Theme.accent.opacity(0.25) : Color.secondary.opacity(0.12), in: Capsule())
+                                        .background(on ? Theme.accent.opacity(0.25) : Theme.bg, in: Capsule())
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -66,7 +66,7 @@ struct UnlockView: View {
                             .frame(minHeight: 110)
                             .scrollContentBackground(.hidden)
                             .padding(6)
-                            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                            .background(Theme.bg, in: RoundedRectangle(cornerRadius: 14))
                             .disabled(countdown != nil)
                         Text(remainingChars > 0 ? "Encore \(remainingChars) caractère\(remainingChars > 1 ? "s" : "") minimum"
                                                 : "Justification suffisante")
@@ -96,7 +96,7 @@ struct UnlockView: View {
                     }
                 }
             }
-            .padding(28)
+            .padding(.horizontal, 28).padding(.top, 40).padding(.bottom, 28)
         }
     }
 

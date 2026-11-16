@@ -146,7 +146,7 @@ struct AppsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Apps").font(.largeTitle.bold())
+            Text("Apps").screenTitle()
             Text("Active l'interrupteur pour bloquer une app. Elle sera fermée dès qu'elle s'ouvre.")
                 .foregroundStyle(.secondary)
             TextField("Rechercher (ex. Apple TV, Safari…)", text: $query)
@@ -160,7 +160,7 @@ struct AppsView: View {
                     .scrollContentBackground(.hidden)
             }
         }
-        .padding(28)
+        .padding(.horizontal, 28).padding(.top, 40).padding(.bottom, 28)
         .task {
             loading = true
             let scanned = await Task.detached(priority: .userInitiated) { InstalledApp.scan() }.value
@@ -177,7 +177,7 @@ struct SitesView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Sites web").font(.largeTitle.bold())
+            Text("Sites web").screenTitle()
             HStack {
                 TextField("exemple.com", text: $input).textFieldStyle(.roundedBorder).onSubmit(add)
                 Button("Ajouter", action: add).buttonStyle(.borderedProminent).tint(Theme.accent)
@@ -201,7 +201,7 @@ struct SitesView: View {
             }
             .scrollContentBackground(.hidden)
         }
-        .padding(28)
+        .padding(.horizontal, 28).padding(.top, 40).padding(.bottom, 28)
     }
 
     private func add() {
@@ -222,7 +222,7 @@ struct SuggestionChips: View {
                 } label: {
                     Label(s.name, systemImage: on ? "checkmark.circle.fill" : "plus.circle")
                         .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(on ? Theme.accent.opacity(0.25) : Color.secondary.opacity(0.12), in: Capsule())
+                        .background(on ? Theme.accent.opacity(0.25) : Theme.card, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }

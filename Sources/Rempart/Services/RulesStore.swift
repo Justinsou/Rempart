@@ -141,6 +141,15 @@ final class RulesStore: ObservableObject {
         save()
     }
 
+    func lastDays(_ n: Int) -> [(label: String, count: Int)] {
+        let cal = Calendar.current
+        let f = DateFormatter(); f.locale = Locale(identifier: "fr_FR"); f.dateFormat = "EEEEE"
+        return (0..<n).reversed().map { offset in
+            let d = cal.date(byAdding: .day, value: -offset, to: now) ?? now
+            return (f.string(from: d).uppercased(), state.blockCounts[Self.dayFormatter.string(from: d)] ?? 0)
+        }
+    }
+
     var blocksToday: Int { state.blockCounts[Self.dayFormatter.string(from: now)] ?? 0 }
 
     // MARK: Fichier hosts (lu par le service système)

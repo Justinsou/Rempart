@@ -9,9 +9,9 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Image(systemName: "shield.lefthalf.filled").font(.system(size: 44)).foregroundStyle(Theme.gradient)
+            BlobView(mood: [Mood.calm, .happy, .sleepy, .sad][step], size: 90)
             Text(["Bienvenue dans Rempart", "Choisis les apps à bloquer", "Choisis les sites à bloquer", "Dernières autorisations"][step])
-                .font(.title.bold())
+                .font(.system(size: 26, weight: .bold, design: .rounded))
 
             Group {
                 switch step {
@@ -54,7 +54,9 @@ struct OnboardingView: View {
             }
         }
         .padding(32)
-        .frame(width: 560, height: 520)
+        .frame(width: 560, height: 560)
+        .background(Theme.bg)
+        .preferredColorScheme(.dark)
         .task {
             apps = await Task.detached(priority: .userInitiated) { InstalledApp.scan() }.value
         }
