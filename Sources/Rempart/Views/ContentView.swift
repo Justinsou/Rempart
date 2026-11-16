@@ -23,6 +23,7 @@ struct ContentView: View {
                 case .apps: AppsView()
                 case .sites: SitesView()
                 case .unlock: UnlockView()
+                case .circle: CircleView()
                 case .journal: JournalView()
                 }
             }
@@ -134,10 +135,29 @@ struct WeekChart: View {
 
 struct DashboardView: View {
     @EnvironmentObject var store: RulesStore
+    @State private var needsHelper = HostsHelperInstaller.needsInstallOrUpdate
 
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
+                if needsHelper {
+                    Card {
+                        HStack(spacing: 14) {
+                            Image(systemName: "exclamationmark.shield.fill").font(.title2).foregroundStyle(.orange)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(HostsHelperInstaller.isInstalled ? "Mettre à jour la protection" : "Active la protection permanente")
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                Text("Sans elle, les apps bloquées peuvent s'ouvrir quand Rempart est fermé.")
+                                    .font(.callout).foregroundStyle(Theme.muted)
+                            }
+                            Spacer()
+                            PillButton(title: HostsHelperInstaller.isInstalled ? "Mettre à jour" : "Installer", icon: "lock.shield") {
+                                _ = HostsHelperInstaller.install()
+                                needsHelper = HostsHelperInstaller.needsInstallOrUpdate
+                            }
+                        }
+                    }
+                }
                 let protectedNow = store.activeSessions.isEmpty
                 ZStack {
                     RoundedRectangle(cornerRadius: 32).fill(Theme.card)

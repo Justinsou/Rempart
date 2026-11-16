@@ -14,7 +14,7 @@ enum Theme {
 }
 
 enum Tab: String, CaseIterable, Identifiable {
-    case dashboard, apps, sites, unlock, journal
+    case dashboard, apps, sites, unlock, circle, journal
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -22,6 +22,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .apps: "Apps"
         case .sites: "Sites web"
         case .unlock: "Débloquer"
+        case .circle: "Proches"
         case .journal: "Journal"
         }
     }
@@ -31,6 +32,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .apps: "square.grid.2x2"
         case .sites: "globe"
         case .unlock: "lock.open"
+        case .circle: "person.2"
         case .journal: "book.closed"
         }
     }
@@ -61,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             _ = RulesStore.shared
             AppBlocker.shared.start()
             WebBlocker.shared.start()
+            ApprovalService.shared.start()
             for w in NSApp.windows where w.identifier?.rawValue.contains("main") == true {
                 WindowKeepAlive.shared.watch(w)
             }

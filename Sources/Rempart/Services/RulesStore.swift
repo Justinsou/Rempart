@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import AppKit
 
 @MainActor
 final class RulesStore: ObservableObject {
@@ -12,6 +13,7 @@ final class RulesStore: ObservableObject {
     private let stateURL: URL
     static let hostsRulesDir = "/Users/Shared/Rempart"
     static let hostsRulesPath = "/Users/Shared/Rempart/hosts-rules.txt"
+    static let appsRulesPath = "/Users/Shared/Rempart/apps-rules.txt"
     private var timer: Timer?
 
     var apps: [BlockedApp] { state.apps }
@@ -184,5 +186,57 @@ final class RulesStore: ObservableObject {
                                 attributes: [.posixPermissions: 0o755])
         try? (lines.joined(separator: "\n") + "\n").write(toFile: Self.hostsRulesPath, atomically: true, encoding: .utf8)
         try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: Self.hostsRulesPath)
+
+        // Règles d'apps : le service système ferme ces apps même si Rempart est quitté.
+        // Format : "<fin_du_déblocage_epoch ou 0>|<chemin de l'app>"
+        var appLines: [String] = []
+        for a in state.apps {
+            let path = a.path ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: a.bundleID)?.path
+            guard let path, path.hasSuffix(".app"), !path.contains("|"), !path.contains("\n") else { continue }
+            let until = unlockEnd(for: a.key).map { Int($0.timeIntervalSince1970) } ?? 0
+            appLines.append("\(until)|\(path)")
+        }
+        try? (appLines.joined(separator: "\n") + "\n").write(toFile: Self.appsRulesPath, atomically: true, encoding: .utf8)
+        try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: Self.appsRulesPath)
+    }
+
+    // MARK: Proches et demandes d'approbation
+    var contacts: [TrustedContact] { state.contacts }
+    var requests: [ApprovalRequest] { state.requests.sorted { $0.created > $1.created } }
+    var pendingRequests: [ApprovalRequest] { state.requests.filter { $0.status == .pending } }
+
+    @discardableResult
+    func addContact(name: String) -> TrustedContact? {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !n.isEmpty else { return nil }
+        let slug = String(n.lowercased().filter { $0.isLetter || $0.isNumber }.prefix(10))
+        let rand = (0..<12).map { _ in "abcdefghijklmnopqrstuvwxyz0123456789".randomElement()! }
+        let c = TrustedContact(name: n, topic: "rempart-\(slug)-" + String(rand))
+        mutate { $0.contacts.append(c) }
+        return c
+    }
+
+    func removeContact(_ c: TrustedContact) { mutate { $0.contacts.removeAll { $0.id == c.id } } }
+
+    func addRequest(_ r: ApprovalRequest) { mutate { $0.requests.append(r) } }
+
+    func resolveRequest(_ id: UUID, status: RequestStatus, grantedMinutes: Int? = nil) {
+        guard let r = state.requests.first(where: { $0.id == id }), r.status == .pending else { return }
+        mutate {
+            if let i = $0.requests.firstIndex(where: { $0.id == id }) {
+                $0.requests[i].status = status
+                $0.requests[i].grantedMinutes = grantedMinutes
+            }
+        }
+        if status == .approved, let m = grantedMinutes {
+            addUnlock(items: r.items, minutes: m, reason: "Approuvé par \(r.contactName) — « \(r.message) »")
+        }
+    }
+
+    func expireOldRequests() {
+        let limit = Date().addingTimeInterval(-3600)
+        for r in state.requests where r.status == .pending && r.created < limit {
+            resolveRequest(r.id, status: .expired)
+        }
     }
 }

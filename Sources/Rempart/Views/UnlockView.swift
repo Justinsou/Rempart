@@ -28,8 +28,119 @@ struct UnlockView: View {
     @State private var timer: Timer?
     @State private var done = false
 
+    @State private var mode = Mode.me
+    @State private var contactID: UUID?
+    @State private var friendMessage = ""
+    @State private var sending = false
+    @State private var sendError: String?
+    @State private var sentTo: String?
+    enum Mode: Hashable { case me, friend }
+
     static let minChars = 50
     static let wait = 60
+    static let friendMinChars = 15
+
+    private var selectedContact: TrustedContact? {
+        store.contacts.first { $0.id == contactID } ?? (store.contacts.count == 1 ? store.contacts.first : nil)
+    }
+    private var friendChars: Int { friendMessage.trimmingCharacters(in: .whitespacesAndNewlines).count }
+    private var canSendFriend: Bool {
+        !selected.isEmpty && selectedContact != nil && friendChars >= Self.friendMinChars && !sending
+    }
+
+    @ViewBuilder private var friendSection: some View {
+        StepCard(number: 3, title: "À qui demander ?") {
+            if store.contacts.isEmpty {
+                Text("Tu n'as pas encore ajouté de proche.").foregroundStyle(Theme.muted)
+                PillButton(title: "Ajouter un proche", icon: "person.badge.plus") { router.tab = .circle }
+            } else {
+                FlowLayout(spacing: 8) {
+                    ForEach(store.contacts) { c in
+                        let on = selectedContact?.id == c.id
+                        Button { contactID = c.id } label: {
+                            Label(c.name, systemImage: on ? "checkmark.circle.fill" : "person.circle")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .padding(.horizontal, 14).padding(.vertical, 8)
+                                .foregroundStyle(on ? Theme.accent : .white)
+                                .background(on ? Theme.accent.opacity(0.18) : Theme.bg, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        StepCard(number: 4, title: "Ton message") {
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: $friendMessage)
+                    .font(.system(size: 14, design: .rounded))
+                    .scrollContentBackground(.hidden)
+                    .padding(10).frame(minHeight: 90)
+                    .background(Theme.bg, in: RoundedRectangle(cornerRadius: 16))
+                if friendMessage.isEmpty {
+                    Text("Ex. : je regarde un film ce soir, je peux avoir Apple TV 2 h ?")
+                        .foregroundStyle(Theme.muted).padding(.horizontal, 16).padding(.vertical, 18)
+                        .allowsHitTesting(false)
+                }
+            }
+            Text(friendChars >= Self.friendMinChars ? "Prêt à envoyer" : "Encore \(Self.friendMinChars - friendChars) caractères minimum")
+                .font(.caption).foregroundStyle(friendChars >= Self.friendMinChars ? Theme.accent : .orange)
+        }
+        Button {
+            guard let c = selectedContact else { return }
+            sending = true; sendError = nil
+            Task {
+                let ok = await ApprovalService.shared.sendRequest(
+                    to: c, items: Array(selected), minutes: minutes,
+                    message: friendMessage.trimmingCharacters(in: .whitespacesAndNewlines))
+                sending = false
+                if ok { sentTo = c.name; selected = []; friendMessage = "" }
+                else { sendError = "Impossible d'envoyer la notification. Vérifie ta connexion." }
+            }
+        } label: {
+            Text(sending ? "Envoi…" : "Envoyer la demande")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .frame(maxWidth: .infinity).padding(.vertical, 16)
+                .foregroundStyle(Color(red: 0.03, green: 0.12, blue: 0.2))
+                .background(Theme.gradient.opacity(canSendFriend ? 1 : 0.3), in: RoundedRectangle(cornerRadius: 20))
+        }
+        .buttonStyle(.plain).disabled(!canSendFriend)
+        if let sendError { Banner(icon: "exclamationmark.triangle.fill", text: sendError, tint: .orange) }
+        if let sentTo {
+            Banner(icon: "paperplane.fill", text: "Demande envoyée à \(sentTo). Tu seras débloqué dès qu'il approuve.")
+        }
+    }
+
+    @ViewBuilder private var requestsSection: some View {
+        let recent = Array(store.requests.prefix(5))
+        if !recent.isEmpty {
+            Text("Demandes à tes proches").caption2Label().padding(.top, 6)
+            ForEach(recent) { r in
+                Card {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("\(r.contactName) · " + r.items.map(store.name(for:)).joined(separator: ", "))
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            Text(r.message).font(.callout).foregroundStyle(Theme.muted).lineLimit(2)
+                        }
+                        Spacer()
+                        statusPill(r)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func statusPill(_ r: ApprovalRequest) -> some View {
+        let (text, color): (String, Color) = switch r.status {
+        case .pending: ("En attente…", .orange)
+        case .approved: ("Approuvé · \(r.grantedMinutes ?? r.minutes) min", Theme.accent)
+        case .denied: ("Refusé", Color(red: 1, green: 0.45, blue: 0.5))
+        case .expired: ("Expirée", Theme.muted)
+        }
+        Text(text).font(.system(size: 12, weight: .bold, design: .rounded))
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(color.opacity(0.18), in: Capsule()).foregroundStyle(color)
+    }
 
     private var durations: [(String, Int)] {
         let midnight = Calendar.current.startOfDay(for: Date()).addingTimeInterval(86400)
@@ -51,6 +162,9 @@ struct UnlockView: View {
                 PageHeader(title: "Débloquer",
                            subtitle: "Explique pourquoi. Ton texte est gardé dans le journal.",
                            mood: countdown == nil ? .happy : .sleepy)
+
+                SegmentedTabs(options: [(Mode.me, "Par moi-même"), (.friend, "Demander à un proche")],
+                              selection: $mode)
 
                 if items.isEmpty {
                     VStack(spacing: 12) {
@@ -93,6 +207,9 @@ struct UnlockView: View {
                         }
                     }
 
+                    if mode == .friend {
+                        friendSection
+                    } else {
                     StepCard(number: 3, title: "Pourquoi") {
                         ZStack(alignment: .topLeading) {
                             TextEditor(text: $reason)
@@ -146,6 +263,9 @@ struct UnlockView: View {
                         }
                         .buttonStyle(.plain).disabled(!canRequest)
                     }
+                    }
+
+                    requestsSection
 
                     if done {
                         Banner(icon: "checkmark.circle.fill", text: "Débloqué ! Tu peux maintenant retirer l'élément de la liste si besoin. Bon usage.")

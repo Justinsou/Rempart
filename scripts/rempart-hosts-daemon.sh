@@ -1,13 +1,18 @@
 #!/bin/bash
-# Service système Rempart : maintient la section Rempart de /etc/hosts.
+# REMPART_DAEMON_VERSION=2
+# Service système Rempart (root) :
+#  1. maintient la section Rempart de /etc/hosts (sites bloqués)
+#  2. ferme les apps bloquées, même si l'app Rempart est quittée
 RULES="/Users/Shared/Rempart/hosts-rules.txt"
+APPS="/Users/Shared/Rempart/apps-rules.txt"
 HOSTS="/etc/hosts"
 BEGIN="# >>> REMPART BEGIN"
 END="# <<< REMPART END"
 DOMAIN_RE='^([a-z0-9-]+\.)+[a-z]{2,}$'
 NUM_RE='^[0-9]+$'
 
-while true; do
+sync_hosts() {
+  local now block tmp p domain until
   now=$(date +%s)
   block=""
   if [ -f "$RULES" ]; then
@@ -35,5 +40,28 @@ while true; do
     killall -HUP mDNSResponder 2>/dev/null
   fi
   rm -f "$tmp"
-  sleep 3
+}
+
+kill_apps() {
+  [ -f "$APPS" ] || return
+  local now procs until path pid
+  now=$(date +%s)
+  procs=$(ps -axo pid=,command=)
+  while IFS='|' read -r until path; do
+    [[ "$until" =~ $NUM_RE ]] || continue
+    [[ "$path" == /*.app ]] || continue
+    case "$path" in
+      */Rempart.app|*/Finder.app|*/System\ Settings.app) continue ;;
+    esac
+    [ "$until" -gt "$now" ] && continue
+    for pid in $(printf "%s\n" "$procs" | awk -v p="$path/Contents/" 'index($0,p)>0 {print $1}'); do
+      kill -9 "$pid" 2>/dev/null
+    done
+  done < "$APPS"
+}
+
+while true; do
+  sync_hosts
+  kill_apps
+  sleep 2
 done

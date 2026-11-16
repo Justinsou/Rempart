@@ -7,7 +7,7 @@ struct InstalledApp: Identifiable, Hashable {
     let path: String
     let searchTerms: [String]
     var id: String { bundleID }
-    var blocked: BlockedApp { BlockedApp(bundleID: bundleID, name: name) }
+    var blocked: BlockedApp { BlockedApp(bundleID: bundleID, name: name, path: path) }
 
     /// Noms plus clairs pour certaines apps système (ex. TV → Apple TV).
     private static let friendlyNames: [String: String] = [
