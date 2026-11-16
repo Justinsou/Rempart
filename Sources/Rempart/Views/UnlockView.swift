@@ -124,26 +124,31 @@ struct UnlockView: View {
             }.padding(.top, 6)
             ForEach(recent) { r in
                 Card {
-                    HStack {
+                    HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("\(r.contactName) · " + r.items.map(store.name(for:)).joined(separator: ", "))
                                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                             Text(r.message).font(.callout).foregroundStyle(Theme.muted).lineLimit(2)
                         }
-                        Spacer()
+                        Spacer(minLength: 8)
                         statusPill(r)
                     }
-                    HStack(spacing: 8) {
+                    HStack(spacing: 10) {
                         if r.status == .pending {
-                            PillButton(title: "Vérifier la réponse", icon: "arrow.clockwise", style: .subtle) {
+                            PillButton(title: "Vérifier", icon: "arrow.clockwise", style: .subtle) {
                                 requestFeedback[r.id] = ApprovalService.shared.checkNow(r)
                             }
-                            PillButton(title: "Annuler", icon: "xmark", style: .danger) { store.cancelRequest(r.id) }
+                            PillButton(title: "Annuler la demande", icon: "xmark.circle.fill", style: .danger) {
+                                store.cancelRequest(r.id)
+                            }
                         } else {
-                            PillButton(title: "Supprimer", icon: "trash", style: .danger) { store.deleteRequest(r.id) }
+                            PillButton(title: "Supprimer", icon: "trash.fill", style: .danger) {
+                                store.deleteRequest(r.id)
+                            }
                         }
                         Spacer()
                     }
+                    .padding(.top, 4)
                     if let f = requestFeedback[r.id], r.status == .pending {
                         Text(f).font(.caption).foregroundStyle(Theme.accent)
                     }
