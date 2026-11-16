@@ -118,11 +118,8 @@ final class ApprovalService: ObservableObject {
             .replacingOccurrences(of: "(", with: "")
             .replacingOccurrences(of: ")", with: "")
 
-        // 1) AppleScript : dernier message reçu du contact
-        if let text = lastIncomingMessage(from: r.replyTopic),
-           let d = parseDecision(text) { return d }
-
-        // 2) Base SQLite de Messages (nécessite « Accès complet au disque »)
+        // Base SQLite de Messages (nécessite « Accès complet au disque »).
+        // Seuls les messages reçus APRÈS la demande comptent.
         return decisionFromChatDB(handle: handle, since: since)
     }
 
@@ -163,7 +160,7 @@ final class ApprovalService: ObservableObject {
 
         // Cherche les messages entrants récents dont l'expéditeur correspond au handle.
         let sql = """
-        SELECT m.text FROM message m
+        SELECT m.text, m.attributedBody FROM message m
         JOIN handle h ON m.handle_id = h.ROWID
         WHERE m.is_from_me = 0
           AND m.date/1000000000 + 978307200 >= ?
@@ -179,16 +176,79 @@ final class ApprovalService: ObservableObject {
         let key = digits.count >= 7 ? String(digits) : handle
         key.withCString { c1 in
             sqlite3_bind_text(stmt, 2, c1, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            key.withCString { c2 in
+            _ = key.withCString { c2 in
                 sqlite3_bind_text(stmt, 3, c2, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             }
         }
 
         while sqlite3_step(stmt) == SQLITE_ROW {
-            guard let c = sqlite3_column_text(stmt, 0) else { continue }
-            if let d = parseDecision(String(cString: c)) { return d }
+            if let text = Self.messageText(stmt), let d = parseDecision(text) { return d }
         }
         return nil
+    }
+
+    /// Texte d'un message : colonne `text`, sinon décodage de `attributedBody` (macOS récents).
+    private static func messageText(_ stmt: OpaquePointer) -> String? {
+        if let c = sqlite3_column_text(stmt, 0) {
+            let s = String(cString: c)
+            if !s.isEmpty { return s }
+        }
+        let n = Int(sqlite3_column_bytes(stmt, 1))
+        guard n > 0, let p = sqlite3_column_blob(stmt, 1) else { return nil }
+        let bytes = [UInt8](UnsafeBufferPointer(start: p.assumingMemoryBound(to: UInt8.self), count: n))
+        let marker = Array("NSString".utf8)
+        guard let mi = bytes.indices.first(where: { i in
+            i + marker.count < bytes.count && Array(bytes[i..<i + marker.count]) == marker
+        }) else { return nil }
+        var i = mi + marker.count
+        // Cherche le séparateur 0x2B ('+') suivi de la longueur
+        let limit = min(bytes.count - 2, i + 12)
+        while i < limit && bytes[i] != 0x2B { i += 1 }
+        guard i < limit else { return nil }
+        i += 1
+        var len = Int(bytes[i]); i += 1
+        if len == 0x81, i + 1 < bytes.count { len = Int(bytes[i]) | (Int(bytes[i + 1]) << 8); i += 2 }
+        guard len > 0, i + len <= bytes.count else { return nil }
+        return String(bytes: bytes[i..<i + len], encoding: .utf8)
+    }
+
+    // MARK: Diagnostic
+    /// Explique pourquoi une réponse est détectée ou non.
+    func diagnose(for contact: TrustedContact) -> String {
+        let path = NSHomeDirectory() + "/Library/Messages/chat.db"
+        var db: OpaquePointer?
+        let rc = sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nil)
+        defer { if let db { sqlite3_close(db) } }
+        guard rc == SQLITE_OK, let db else {
+            return "Accès refusé à Messages. Ajoute Rempart dans Accès complet au disque (puis relance l'app)."
+        }
+        var probe: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM message", -1, &probe, nil) == SQLITE_OK else {
+            return "Accès refusé à Messages. Ajoute Rempart dans Accès complet au disque (puis relance l'app)."
+        }
+        sqlite3_finalize(probe)
+
+        let handle = contact.handle.lowercased()
+            .replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
+        let digits = handle.filter(\.isNumber)
+        let key = digits.count >= 7 ? String(digits) : handle
+        let sql = """
+        SELECT m.text, m.attributedBody, m.is_from_me FROM message m
+        JOIN handle h ON m.handle_id = h.ROWID
+        WHERE REPLACE(REPLACE(REPLACE(REPLACE(LOWER(h.id),' ',''),'-',''),'(',''),')','') LIKE '%' || ? || '%'
+        ORDER BY m.date DESC LIMIT 1;
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else { return "Accès OK mais lecture impossible." }
+        defer { sqlite3_finalize(stmt) }
+        key.withCString { _ = sqlite3_bind_text(stmt, 1, $0, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self)) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else {
+            return "Accès OK, mais aucune conversation trouvée avec \(contact.handle). Vérifie le numéro / e-mail."
+        }
+        let text = Self.messageText(stmt) ?? "(illisible)"
+        let fromMe = sqlite3_column_int(stmt, 2) == 1
+        return "Accès OK. Dernier message \(fromMe ? "envoyé" : "reçu") : « \(text.prefix(60)) »"
     }
 
     private func parseDecision(_ raw: String) -> String? {

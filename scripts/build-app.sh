@@ -45,7 +45,13 @@ cat > "$APP/Contents/Info.plist" <<'EOF'
 EOF
 
 echo "→ Signature locale…"
-codesign --force --deep -s - "$APP"
+# Une identité stable garde les autorisations macOS (Accès complet au disque, Automatisation)
+# entre les recompilations. Sinon : signature ad hoc (les autorisations sont à refaire à chaque build).
+if security find-identity -p codesigning | grep -q "Rempart Local Signing"; then
+  codesign --force --deep -s "Rempart Local Signing" "$APP"
+else
+  codesign --force --deep -s - "$APP"
+fi
 
 if [ "$1" != "--no-install" ]; then
   echo "→ Installation dans /Applications…"

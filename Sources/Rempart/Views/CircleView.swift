@@ -62,6 +62,9 @@ struct CircleView: View {
                                 feedback[c.id] = ApprovalService.shared.sendTest(to: c)
                                     ? "Message ouvert / envoyé" : "Échec : autorise Rempart à contrôler Messages"
                             }
+                            PillButton(title: "Vérifier la lecture des réponses", icon: "stethoscope", style: .subtle) {
+                                feedback[c.id] = ApprovalService.shared.diagnose(for: c)
+                            }
                             Spacer()
                             PillButton(title: "Retirer", icon: "trash", style: .danger) { store.removeContact(c) }
                         }
@@ -72,7 +75,15 @@ struct CircleView: View {
                 }
 
                 Banner(icon: "lock.rectangle",
-                       text: "Pour lire les réponses automatiquement, autorise Rempart dans Réglages → Confidentialité → Automatisation (Messages) et, si besoin, Accès complet au disque.")
+                       text: "Pour lire les réponses, Rempart doit être dans Réglages → Confidentialité → Accès complet au disque (puis relance Rempart). Pour envoyer, autorise aussi Automatisation → Messages.")
+                HStack {
+                    PillButton(title: "Ouvrir Accès complet au disque", icon: "gearshape", style: .subtle) {
+                        if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
+                            NSWorkspace.shared.open(u)
+                        }
+                    }
+                    Spacer()
+                }
             }
             .padding(.horizontal, 28).padding(.top, 40).padding(.bottom, 28)
         }
