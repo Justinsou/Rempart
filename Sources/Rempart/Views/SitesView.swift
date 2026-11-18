@@ -13,8 +13,8 @@ struct SitesView: View {
                        badge: store.sites.isEmpty ? nil : "\(store.sites.count) bloqué\(store.sites.count > 1 ? "s" : "")")
 
             HStack(spacing: 12) {
-                SearchField(text: $input, placeholder: "Ajouter un site (ex. youtube.com)", icon: "globe", onSubmit: add)
-                PillButton(title: "Bloquer", icon: "plus", action: add)
+                SearchField(text: $input, placeholder: "Ajouter un site (ex. youtube.com)", icon: "globe", onSubmit: askAdd)
+                PillButton(title: "Bloquer", icon: "plus", action: askAdd)
                     .scaleEffect(1.1).padding(.horizontal, 6)
             }
             if let error {
@@ -51,10 +51,22 @@ struct SitesView: View {
         .padding(.horizontal, 28).padding(.top, 40).padding(.bottom, 20)
     }
 
-    private func add() {
-        guard !input.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        if store.addSite(input) { input = ""; error = nil }
-        else { error = "Domaine invalide ou déjà présent." }
+    private func askAdd() {
+        let raw = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return }
+        guard let domain = RulesStore.normalize(raw) else {
+            error = "Domaine invalide ou déjà présent."
+            return
+        }
+        if store.isSiteListed(domain) {
+            error = "Domaine invalide ou déjà présent."
+            return
+        }
+        error = nil
+        BlockConfirm.shared.ask(toBlock: domain, kind: "visiter ce site") {
+            if store.addSite(domain) { input = "" }
+            else { error = "Domaine invalide ou déjà présent." }
+        }
     }
 }
 
@@ -96,7 +108,11 @@ struct SuggestionChips: View {
                     if on {
                         // Pendant la configuration initiale seulement.
                         if let site = store.sites.first(where: { $0.domain == s.domain }) { store.removeSite(site) }
-                    } else { store.addSite(s.domain) }
+                    } else {
+                        BlockConfirm.shared.ask(toBlock: s.name, kind: "visiter \(s.domain)") {
+                            store.addSite(s.domain)
+                        }
+                    }
                 } label: {
                     Label(s.name, systemImage: on ? "checkmark.circle.fill" : "plus")
                         .font(.system(size: 13, weight: .semibold, design: .rounded))

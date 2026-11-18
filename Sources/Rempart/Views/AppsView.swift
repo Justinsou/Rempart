@@ -23,6 +23,7 @@ struct AppRow: View {
             Spacer()
             RuleAction(key: "app:" + app.bundleID, listed: listed,
                        canRemove: store.canRemoveApp(app.bundleID), unlockedNow: unlocked,
+                       displayName: app.name, kindLabel: "ouvrir cette app",
                        onAdd: { store.toggleApp(app.blocked) },
                        onRemove: { store.toggleApp(app.blocked) })
         }

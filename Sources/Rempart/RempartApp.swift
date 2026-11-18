@@ -126,7 +126,7 @@ struct RempartApp: App {
             if let s = store.activeSessions.first {
                 Text(Self.remaining(s, now: store.now))
             } else {
-                Image(systemName: "shield.lefthalf.filled")
+                Image(nsImage: MenuBarIcon.blob)
             }
         }
     }

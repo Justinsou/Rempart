@@ -73,19 +73,96 @@ struct PillButton: View {
     }
     private var fg: Color {
         switch style {
-        case .primary: Color(red: 0.03, green: 0.12, blue: 0.2)
+        case .primary: .white
         case .subtle: .white
-        case .danger: Color(red: 1, green: 0.45, blue: 0.5)
+        case .danger: Color(red: 1, green: 0.55, blue: 0.58)
         case .locked: Theme.muted
         }
     }
     private var bg: AnyShapeStyle {
         switch style {
-        case .primary: AnyShapeStyle(Theme.accent)
-        case .subtle: AnyShapeStyle(Color.white.opacity(0.1))
-        case .danger: AnyShapeStyle(Color(red: 1, green: 0.3, blue: 0.4).opacity(0.15))
+        case .primary: AnyShapeStyle(Theme.accent2)
+        case .subtle: AnyShapeStyle(Color.white.opacity(0.12))
+        case .danger: AnyShapeStyle(Color(red: 1, green: 0.3, blue: 0.4).opacity(0.2))
         case .locked: AnyShapeStyle(Color.white.opacity(0.06))
         }
+    }
+}
+
+/// Gros bouton d'action : texte toujours lisible, même désactivé.
+struct PrimaryCTA: View {
+    let title: String
+    var enabled = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .frame(maxWidth: .infinity).padding(.vertical, 16)
+                .foregroundStyle(.white)
+                .background(
+                    enabled
+                        ? AnyShapeStyle(Theme.gradient)
+                        : AnyShapeStyle(Color.white.opacity(0.12)),
+                    in: RoundedRectangle(cornerRadius: 20)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.7)
+    }
+}
+
+@MainActor
+final class BlockConfirm: ObservableObject {
+    static let shared = BlockConfirm()
+    @Published var isPresented = false
+    @Published var title = ""
+    @Published var detail = ""
+    private var onConfirm: (() -> Void)?
+
+    func ask(toBlock name: String, kind: String, confirm: @escaping () -> Void) {
+        title = "Bloquer \(name) ?"
+        detail = "Tu ne pourras plus \(kind) sans déblocage justifié. Es-tu sûr ?"
+        onConfirm = confirm
+        isPresented = true
+    }
+
+    func confirm() {
+        let action = onConfirm
+        onConfirm = nil
+        isPresented = false
+        action?()
+    }
+
+    func cancel() {
+        onConfirm = nil
+        isPresented = false
+    }
+}
+
+struct BlockConfirmSheet: View {
+    @ObservedObject private var confirm = BlockConfirm.shared
+
+    var body: some View {
+        VStack(spacing: 16) {
+            BlobView(mood: .angry, size: 72, glow: false)
+            Text(confirm.title).font(.system(size: 22, weight: .bold, design: .rounded))
+            Text(confirm.detail)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(Theme.muted)
+                .padding(.horizontal, 8)
+            HStack(spacing: 12) {
+                PillButton(title: "Annuler", style: .subtle) { confirm.cancel() }
+                PillButton(title: "Oui, bloquer", icon: "lock.fill") { confirm.confirm() }
+            }
+            .padding(.top, 4)
+        }
+        .padding(28)
+        .frame(width: 380)
+        .background(Theme.bg)
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -132,12 +209,20 @@ struct RuleAction: View {
     let listed: Bool
     let canRemove: Bool
     let unlockedNow: Bool
+    var displayName: String = ""
+    var kindLabel: String = "l'utiliser"
     let onAdd: () -> Void
     let onRemove: () -> Void
 
     var body: some View {
         if !listed {
-            PillButton(title: "Bloquer", icon: "plus", action: onAdd)
+            PillButton(title: "Bloquer", icon: "plus") {
+                BlockConfirm.shared.ask(
+                    toBlock: displayName.isEmpty ? key : displayName,
+                    kind: kindLabel,
+                    confirm: onAdd
+                )
+            }
         } else if canRemove {
             PillButton(title: "Retirer", icon: "minus", style: .danger, action: onRemove)
         } else {

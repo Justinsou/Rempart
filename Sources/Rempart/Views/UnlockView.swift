@@ -7,9 +7,9 @@ struct StepCard<Content: View>: View {
     var body: some View {
         Card {
             HStack(spacing: 10) {
-                Text("\(number)").font(.system(size: 12, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color(red: 0.03, green: 0.12, blue: 0.2))
-                    .frame(width: 22, height: 22).background(Theme.accent, in: Circle())
+                    Text("\(number)").font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22).background(Theme.accent2, in: Circle())
                 Text(title).font(.system(size: 16, weight: .semibold, design: .rounded))
             }
             .padding(.bottom, 4)
@@ -86,7 +86,7 @@ struct UnlockView: View {
             Text(friendChars >= Self.friendMinChars ? "Prêt à envoyer" : "Encore \(Self.friendMinChars - friendChars) caractères minimum")
                 .font(.caption).foregroundStyle(friendChars >= Self.friendMinChars ? Theme.accent : .orange)
         }
-        Button {
+        PrimaryCTA(title: sending ? "Envoi…" : "Envoyer par Messages", enabled: canSendFriend) {
             guard let c = selectedContact else { return }
             sending = true; sendError = nil
             Task {
@@ -97,14 +97,7 @@ struct UnlockView: View {
                 if ok { sentTo = c.name; selected = []; friendMessage = "" }
                 else { sendError = "Impossible d'envoyer le message. Autorise Rempart à contrôler Messages, ou vérifie le numéro / e-mail." }
             }
-        } label: {
-            Text(sending ? "Envoi…" : "Envoyer par Messages")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .frame(maxWidth: .infinity).padding(.vertical, 16)
-                .foregroundStyle(Color(red: 0.03, green: 0.12, blue: 0.2))
-                .background(Theme.gradient.opacity(canSendFriend ? 1 : 0.3), in: RoundedRectangle(cornerRadius: 20))
         }
-        .buttonStyle(.plain).disabled(!canSendFriend)
         if let sendError { Banner(icon: "exclamationmark.triangle.fill", text: sendError, tint: .orange) }
         if let sentTo {
             Banner(icon: "bubble.left.and.bubble.right.fill",
@@ -227,8 +220,8 @@ struct UnlockView: View {
                                 Button { minutes = d.1 } label: {
                                     Text(d.0).font(.system(size: 13, weight: .semibold, design: .rounded))
                                         .padding(.horizontal, 16).padding(.vertical, 8)
-                                        .foregroundStyle(on ? Color(red: 0.03, green: 0.12, blue: 0.2) : .white)
-                                        .background(on ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Theme.bg), in: Capsule())
+                                        .foregroundStyle(.white)
+                                        .background(on ? AnyShapeStyle(Theme.accent2) : AnyShapeStyle(Theme.bg), in: Capsule())
                                 }
                                 .buttonStyle(.plain).disabled(countdown != nil)
                             }
@@ -282,14 +275,7 @@ struct UnlockView: View {
                             }
                         }
                     } else {
-                        Button { startCountdown() } label: {
-                            Text("Demander le déblocage")
-                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                                .frame(maxWidth: .infinity).padding(.vertical, 16)
-                                .foregroundStyle(Color(red: 0.03, green: 0.12, blue: 0.2))
-                                .background(Theme.gradient.opacity(canRequest ? 1 : 0.3), in: RoundedRectangle(cornerRadius: 20))
-                        }
-                        .buttonStyle(.plain).disabled(!canRequest)
+                        PrimaryCTA(title: "Demander le déblocage", enabled: canRequest, action: startCountdown)
                     }
                     }
 

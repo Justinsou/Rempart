@@ -13,6 +13,7 @@ extension View {
 struct ContentView: View {
     @EnvironmentObject var store: RulesStore
     @EnvironmentObject var router: AppRouter
+    @StateObject private var blockConfirm = BlockConfirm.shared
 
     var body: some View {
         HStack(spacing: 0) {
@@ -33,6 +34,9 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: Binding(get: { !store.onboarded }, set: { _ in })) {
             OnboardingView().environmentObject(store).interactiveDismissDisabled()
+        }
+        .sheet(isPresented: $blockConfirm.isPresented) {
+            BlockConfirmSheet()
         }
     }
 }
