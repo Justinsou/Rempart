@@ -29,7 +29,12 @@ struct UnlockView: View {
     @State private var requestFeedback: [UUID: String] = [:]
     @State private var done = false
 
-    @State private var mode = Mode.me
+    /// Pause « par moi-même » : code conservé, UI désactivée pour l'instant.
+    private enum SelfUnlock {
+        static let enabled = false
+    }
+
+    @State private var mode = Mode.friend
     @State private var contactID: UUID?
     @State private var friendMessage = ""
     @State private var sending = false
@@ -181,11 +186,15 @@ struct UnlockView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 PageHeader(title: "Débloquer",
-                           subtitle: "Explique pourquoi. Ton texte est gardé dans le journal.",
+                           subtitle: SelfUnlock.enabled
+                               ? "Explique pourquoi. Ton texte est gardé dans le journal."
+                               : "Demande à un proche : il reçoit un message et répond OUI ou NON.",
                            mood: countdown == nil ? .happy : .sleepy)
 
-                SegmentedTabs(options: [(Mode.me, "Par moi-même"), (.friend, "Demander à un proche")],
-                              selection: $mode)
+                if SelfUnlock.enabled {
+                    SegmentedTabs(options: [(Mode.me, "Par moi-même"), (.friend, "Demander à un proche")],
+                                  selection: $mode)
+                }
 
                 if items.isEmpty {
                     VStack(spacing: 12) {
@@ -228,9 +237,10 @@ struct UnlockView: View {
                         }
                     }
 
-                    if mode == .friend {
+                    if !SelfUnlock.enabled || mode == .friend {
                         friendSection
                     } else {
+                    // Conservé : déblocage solo (justification + 60 s). Réactiver via SelfUnlock.enabled.
                     StepCard(number: 3, title: "Pourquoi") {
                         ZStack(alignment: .topLeading) {
                             TextEditor(text: $reason)
