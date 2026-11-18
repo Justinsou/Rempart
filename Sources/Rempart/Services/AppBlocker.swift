@@ -83,13 +83,13 @@ struct BlockOverlayView: View {
             .padding(.top, 26)
             Text("\(title) est bloqué")
                 .font(.system(size: 22, weight: .bold, design: .rounded))
-            Text("Rempart protège ton temps. Si tu as une vraie raison, explique-la pour débloquer temporairement.")
+            Text("Tu as choisi de le bloquer pour protéger ton temps. Si c'est vraiment important, demande à un proche.")
                 .multilineTextAlignment(.center).foregroundStyle(Theme.muted)
                 .padding(.horizontal, 28)
             Spacer(minLength: 0)
             HStack {
                 Button("Compris", action: dismiss).keyboardShortcut(.cancelAction).buttonStyle(.bordered)
-                Button("Demander un déblocage", action: unlock)
+                Button("Demander à un proche", action: unlock)
                     .buttonStyle(.borderedProminent).tint(Theme.accent)
             }
             .controlSize(.large)

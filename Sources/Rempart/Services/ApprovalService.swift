@@ -78,11 +78,13 @@ final class ApprovalService: ObservableObject {
             ? "Réponds OUI pour accepter, OUI15 pour 15 min seulement, ou NON."
             : "Réponds juste OUI ou NON."
         let body = """
-        Salut ! \(first) aimerait utiliser \(names) pendant \(duration).
+        Salut ! \(first) utilise Rempart pour limiter son temps d'écran et te demande de l'aide.
+        Il ou elle aimerait débloquer \(names) pendant \(duration).
 
         « \(message) »
 
         \(reply)
+        Dire NON, c'est aider : tu n'as pas à te justifier. Sans réponse de ta part, rien n'est débloqué.
         """
         guard sendMessage(to: contact.handle, text: body) else { return false }
         store.addRequest(ApprovalRequest(
@@ -99,8 +101,8 @@ final class ApprovalService: ObservableObject {
         let who = NSFullUserName().isEmpty ? "Quelqu'un" : NSFullUserName()
         return sendMessage(to: contact.handle, text: """
         Rempart — test
-        \(who) t'a ajouté comme proche de confiance.
-        Tu recevras ici ses demandes de déblocage. Réponds simplement OUI ou NON.
+        \(who) t'a ajouté comme proche de confiance dans Rempart, une app qui limite son temps d'écran.
+        Tu recevras ici ses demandes de déblocage. Réponds simplement OUI ou NON : tu peux toujours dire NON.
         """)
     }
 

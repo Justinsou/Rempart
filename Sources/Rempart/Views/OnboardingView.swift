@@ -16,7 +16,7 @@ struct OnboardingView: View {
             Group {
                 switch step {
                 case 0:
-                    Text("Rempart bloque tes apps et sites distrayants en permanence. Tu peux les débloquer temporairement en écrivant une vraie raison.")
+                    Text("Rempart bloque tes apps et sites distrayants. Pour en débloquer un temporairement, tu demandes à un proche : il reçoit un message et répond OUI ou NON.")
                         .multilineTextAlignment(.center).foregroundStyle(.secondary)
                 case 1:
                     ScrollView {
@@ -40,6 +40,8 @@ struct OnboardingView: View {
                             }
                         }
                         Text("Au premier site bloqué, macOS te demandera d'autoriser Rempart à contrôler ton navigateur : accepte.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text("Ensuite, ajoute un proche dans l'onglet Proches : sans lui, tu ne pourras rien débloquer.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }

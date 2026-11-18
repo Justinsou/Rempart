@@ -7,12 +7,13 @@
   .wrap{text-align:center}
   svg{width:200px;height:200px;filter:drop-shadow(0 0 40px rgba(230,26,102,.45));animation:f 3s ease-in-out infinite alternate}
   @keyframes f{from{transform:translateY(-8px)}to{transform:translateY(8px)}}
+  @media (prefers-reduced-motion:reduce){svg{animation:none}}
   h1{margin:24px 0 8px;font-size:34px}
   p{color:#8c8c93;line-height:1.5;font-size:17px}
   b{color:#fff}
 </style></head>
 <body><div class="wrap">
-  <svg viewBox="-100 -100 200 200">
+  <svg viewBox="-100 -100 200 200" aria-hidden="true">
     <defs><radialGradient id="g"><stop offset="0" stop-color="#e61a66"/><stop offset="1" stop-color="#f77399"/></radialGradient></defs>
     <path id="b" fill="url(#g)"/>
     <circle cx="-24" cy="-6" r="6" fill="#4d041f"/><circle cx="24" cy="-6" r="6" fill="#4d041f"/>
@@ -20,7 +21,7 @@
     <path d="M-12 30Q0 20 12 30" stroke="#4d041f" stroke-width="5" fill="none" stroke-linecap="round"/>
   </svg>
   <h1>Site bloqué</h1>
-  <p><b id="d"></b> est bloqué par Rempart.<br>Ouvre Rempart si tu as une vraie raison de le débloquer.</p>
+  <p><b id="d"></b> est bloqué : c'est un choix que tu as fait.<br>Si c'est vraiment important, ouvre Rempart et demande à un proche.</p>
 </div>
 <script>
   document.getElementById('d').textContent=decodeURIComponent(location.hash.slice(1))||'Ce site';
