@@ -5,7 +5,7 @@ enum Theme {
     static let bg = Color(red: 0.07, green: 0.07, blue: 0.08)
     static let sidebar = Color(red: 0.055, green: 0.055, blue: 0.065)
     static let card = Color(red: 0.115, green: 0.115, blue: 0.13)
-    static let muted = Color(white: 0.55)
+    static let muted = Color(white: 0.62)
     static let accent = Color(red: 0.30, green: 0.70, blue: 0.97)
     static let accent2 = Color(red: 0.04, green: 0.50, blue: 0.86)
     static var gradient: LinearGradient {
@@ -116,6 +116,12 @@ struct RempartApp: App {
             CommandGroup(replacing: .appTermination) {
                 Button("Quitter Rempart…") { QuitGuard.shared.requestQuit() }
                     .keyboardShortcut("q")
+            }
+            CommandMenu("Aller à") {
+                ForEach(Array(Tab.allCases.enumerated()), id: \.element) { i, tab in
+                    Button(tab.title) { AppRouter.shared.showMain(tab: tab) }
+                        .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
+                }
             }
         }
 

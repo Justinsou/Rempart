@@ -230,7 +230,8 @@ struct RuleAction: View {
                 AppRouter.shared.preselect = [key]
                 AppRouter.shared.tab = .unlock
             }
-            .help("Pour le retirer, débloque-le d'abord avec une justification.")
+            .help("Pour le retirer, demande d'abord un déblocage à un proche.")
+            .accessibilityHint("Ouvre la page Débloquer pour demander à un proche.")
         }
     }
 }

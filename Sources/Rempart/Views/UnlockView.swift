@@ -71,6 +71,7 @@ struct UnlockView: View {
                                 .background(on ? Theme.accent.opacity(0.18) : Theme.bg, in: Capsule())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityAddTraits(on ? .isSelected : [])
                     }
                 }
             }
@@ -100,13 +101,13 @@ struct UnlockView: View {
                     message: friendMessage.trimmingCharacters(in: .whitespacesAndNewlines))
                 sending = false
                 if ok { sentTo = c.name; selected = []; friendMessage = "" }
-                else { sendError = "Impossible d'envoyer le message. Autorise Rempart à contrôler Messages, ou vérifie le numéro / e-mail." }
+                else { sendError = "Le message n'est pas parti. Vérifie le numéro ou le courriel de \(c.name), puis autorise Rempart à contrôler Messages (Réglages > Confidentialité > Automatisation)." }
             }
         }
         if let sendError { Banner(icon: "exclamationmark.triangle.fill", text: sendError, tint: .orange) }
         if let sentTo {
             Banner(icon: "bubble.left.and.bubble.right.fill",
-                   text: "Message envoyé à \(sentTo). Dès qu'il répond OUI, OUI15 ou NON, Rempart applique la décision.")
+                   text: "Message envoyé à \(sentTo). Dès que la réponse (OUI, OUI15 ou NON) arrive, Rempart l'applique. Sans réponse, rien n'est débloqué.")
         }
     }
 
@@ -200,7 +201,7 @@ struct UnlockView: View {
                     VStack(spacing: 12) {
                         BlobView(mood: .calm, size: 100)
                         Text("Rien à débloquer").font(.system(size: 18, weight: .semibold, design: .rounded))
-                        Text("Ajoute d'abord des apps ou des sites à bloquer.").foregroundStyle(Theme.muted)
+                        Text("Tu n'as encore rien bloqué. Ajoute une app ou un site, puis reviens ici au besoin.").foregroundStyle(Theme.muted)
                     }
                     .frame(maxWidth: .infinity).padding(.top, 60)
                 } else {
@@ -218,6 +219,7 @@ struct UnlockView: View {
                                         .background(on ? Theme.accent.opacity(0.18) : Theme.bg, in: Capsule())
                                 }
                                 .buttonStyle(.plain).disabled(countdown != nil)
+                                .accessibilityAddTraits(on ? .isSelected : [])
                             }
                         }
                     }
@@ -233,6 +235,7 @@ struct UnlockView: View {
                                         .background(on ? AnyShapeStyle(Theme.accent2) : AnyShapeStyle(Theme.bg), in: Capsule())
                                 }
                                 .buttonStyle(.plain).disabled(countdown != nil)
+                                .accessibilityAddTraits(on ? .isSelected : [])
                             }
                         }
                     }

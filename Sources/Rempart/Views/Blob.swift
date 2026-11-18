@@ -129,6 +129,7 @@ struct BlobView: View {
     var glow = true
     var float = true
     @State private var up = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -143,10 +144,11 @@ struct BlobView: View {
             }
         }
         .frame(width: size, height: size)
-        .offset(y: float ? (up ? -size * 0.03 : size * 0.03) : 0)
-        .scaleEffect(float ? (up ? 1.02 : 0.98) : 1)
+        .offset(y: float && !reduceMotion ? (up ? -size * 0.03 : size * 0.03) : 0)
+        .scaleEffect(float && !reduceMotion ? (up ? 1.02 : 0.98) : 1)
+        .accessibilityHidden(true)
         .onAppear {
-            guard float else { return }
+            guard float, !reduceMotion else { return }
             withAnimation(.easeInOut(duration: Double.random(in: 2.4...3.4)).repeatForever(autoreverses: true)) { up = true }
         }
     }

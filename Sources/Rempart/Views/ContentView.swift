@@ -76,6 +76,8 @@ struct Sidebar: View {
                     .foregroundStyle(Theme.muted)
             }
             .padding(12)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(store.activeSessions.isEmpty ? "Statut : tout est protégé" : "Statut : un déblocage est en cours")
         }
         .padding(.horizontal, 14).padding(.bottom, 14)
         .frame(width: 220)
@@ -130,6 +132,8 @@ struct WeekChart: View {
                         Text(d.label).font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Theme.muted)
                     }
                     .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(d.label) : \(d.count) blocage\(d.count > 1 ? "s" : "")")
                 }
             }
             .padding(.top, 6)
@@ -306,8 +310,8 @@ struct JournalView: View {
             if entries.isEmpty {
                 VStack(spacing: 14) {
                     BlobView(mood: .sleepy, size: 110)
-                    Text("Rien à signaler").font(.system(size: 20, weight: .semibold, design: .rounded))
-                    Text("Tes justifications de déblocage apparaîtront ici.").foregroundStyle(Theme.muted)
+                    Text("Aucun déblocage pour l'instant").font(.system(size: 20, weight: .semibold, design: .rounded))
+                    Text("Chaque déblocage accordé par un proche apparaîtra ici. Moins il y en a, mieux tu tiens.").foregroundStyle(Theme.muted)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {

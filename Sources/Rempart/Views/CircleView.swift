@@ -43,6 +43,8 @@ struct CircleView: View {
                     VStack(spacing: 10) {
                         BlobView(mood: .calm, size: 90)
                         Text("Aucun proche pour l'instant").foregroundStyle(Theme.muted)
+                        Text("Choisis quelqu'un de confiance : sans proche, tu ne pourras rien débloquer.")
+                            .font(.caption).foregroundStyle(Theme.muted)
                     }
                     .frame(maxWidth: .infinity).padding(.vertical, 24)
                 }
@@ -60,7 +62,7 @@ struct CircleView: View {
                         HStack(spacing: 8) {
                             PillButton(title: "Message test", icon: "paperplane", style: .subtle) {
                                 feedback[c.id] = ApprovalService.shared.sendTest(to: c)
-                                    ? "Message ouvert / envoyé" : "Échec : autorise Rempart à contrôler Messages"
+                                    ? "Message test envoyé à \(c.name)." : "Le message n'est pas parti : autorise Rempart à contrôler Messages."
                             }
                             Spacer()
                             PillButton(title: "Retirer", icon: "trash", style: .danger) { store.removeContact(c) }
