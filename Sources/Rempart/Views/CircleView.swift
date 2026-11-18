@@ -90,8 +90,8 @@ struct CircleView: View {
     private func step(_ n: Int, _ text: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Text("\(n)").font(.system(size: 11, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color(red: 0.03, green: 0.12, blue: 0.2))
-                .frame(width: 20, height: 20).background(Theme.accent, in: Circle())
+                .foregroundStyle(.white)
+                .frame(width: 20, height: 20).background(Theme.accent2, in: Circle())
             Text(text).font(.system(size: 14, design: .rounded)).foregroundStyle(.white.opacity(0.85))
         }
     }
