@@ -8,6 +8,8 @@ final class RulesStore: ObservableObject {
 
     @Published private(set) var state = AppState()
     @Published var now = Date()
+    /// Dernière pause commencée, pour l'afficher une fois. L'utilisateur la ferme ; le compte à rebours reste.
+    @Published var freshPause: UnlockSession?
 
     private let supportDir: URL
     private let stateURL: URL
@@ -70,10 +72,22 @@ final class RulesStore: ObservableObject {
         updateTimer()
     }
 
+    private var warned = Set<UUID>()
+
     private func tick() {
         now = Date()
-        if state.sessions.contains(where: { $0.end <= now }) {
+        for s in state.sessions where !warned.contains(s.id) {
+            let left = s.end.timeIntervalSince(now)
+            if left > 0, left <= 60 {
+                warned.insert(s.id)
+                PauseNotifier.endingSoon(names: s.items.map(name(for:)).joined(separator: ", "))
+            }
+        }
+        let ended = state.sessions.filter { $0.end <= now }
+        if !ended.isEmpty {
             mutate { $0.sessions.removeAll { $0.end <= Date() } }
+            for s in ended { warned.remove(s.id) }
+            PauseNotifier.ended(names: ended.flatMap(\.items).map(name(for:)).joined(separator: ", "))
         }
     }
 
@@ -163,6 +177,11 @@ final class RulesStore: ObservableObject {
         let session = UnlockSession(items: items, start: start, end: end, reason: reason)
         let entry = JournalEntry(date: start, reason: reason, itemNames: items.map(name(for:)), minutes: minutes)
         mutate { $0.sessions.append(session); $0.journal.append(entry) }
+        freshPause = session
+        let by = reason.hasPrefix("Approuvé par ")
+            ? String(reason.dropFirst("Approuvé par ".count).prefix(while: { $0 != "—" }).trimmingCharacters(in: .whitespaces))
+            : nil
+        PauseNotifier.started(names: items.map(name(for:)).joined(separator: ", "), minutes: minutes, by: by)
     }
 
     func endSession(_ s: UnlockSession) { mutate { $0.sessions.removeAll { $0.id == s.id } } }

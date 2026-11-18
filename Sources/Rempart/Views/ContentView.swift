@@ -158,20 +158,14 @@ struct DashboardView: View {
                         }
                     }
                 }
-                let protectedNow = store.activeSessions.isEmpty
-                ZStack {
-                    RoundedRectangle(cornerRadius: 32).fill(Theme.card)
-                    RadialGradient(colors: [(protectedNow ? Mood.calm.center : Mood.happy.center).opacity(0.28), .clear],
-                                   center: .center, startRadius: 10, endRadius: 260)
-                        .clipShape(RoundedRectangle(cornerRadius: 32))
-                    VStack(spacing: 16) {
-                        BlobView(mood: protectedNow ? .calm : .happy, size: 150)
-                            .padding(.top, 22)
-                        Text(protectedNow ? "Rempart veille sur toi" : "Déblocage en cours")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                        Text("\(store.apps.count) app\(store.apps.count > 1 ? "s" : "") · \(store.sites.count) site\(store.sites.count > 1 ? "s" : "") sous surveillance")
-                            .foregroundStyle(Theme.muted)
-                            .padding(.bottom, 24)
+                if let pause = store.freshPause, store.activeSessions.contains(where: { $0.id == pause.id }) {
+                    PauseBanner(session: pause) { store.freshPause = nil }
+                }
+                if store.activeSessions.isEmpty {
+                    IdleHero()
+                } else {
+                    ForEach(store.activeSessions) { s in
+                        PauseClock(session: s)
                     }
                 }
 
@@ -185,34 +179,103 @@ struct DashboardView: View {
                 }
                 WeekChart()
 
-                if !store.activeSessions.isEmpty {
-                    HStack { Text("En cours").caption2Label(); Spacer() }.padding(.top, 6)
-                    ForEach(store.activeSessions) { s in
-                        Card {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(s.items.map(store.name(for:)).joined(separator: ", "))
-                                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                                    Text(s.reason).font(.callout).foregroundStyle(Theme.muted).lineLimit(2)
-                                }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 6) {
-                                    Text(remaining(s)).font(.system(size: 22, weight: .bold, design: .rounded).monospacedDigit())
-                                    Button("Re-bloquer") { store.endSession(s) }
-                                        .buttonStyle(.plain).foregroundStyle(Theme.accent).font(.callout.weight(.medium))
-                                }
-                            }
-                        }
-                    }
-                }
             }
             .padding(.horizontal, 28).padding(.top, 40).padding(.bottom, 28)
         }
     }
+}
 
-    private func remaining(_ s: UnlockSession) -> String {
-        let t = max(0, Int(s.end.timeIntervalSince(store.now)))
-        return String(format: "%d:%02d:%02d", t / 3600, (t % 3600) / 60, t % 60)
+/// État calme : rien n'est débloqué.
+private struct IdleHero: View {
+    @EnvironmentObject var store: RulesStore
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 32).fill(Theme.card)
+            RadialGradient(colors: [Mood.calm.center.opacity(0.28), .clear],
+                           center: .center, startRadius: 10, endRadius: 260)
+                .clipShape(RoundedRectangle(cornerRadius: 32))
+            VStack(spacing: 16) {
+                BlobView(mood: .calm, size: 150).padding(.top, 22)
+                Text("Rempart veille sur toi")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                Text("\(store.apps.count) app\(store.apps.count > 1 ? "s" : "") · \(store.sites.count) site\(store.sites.count > 1 ? "s" : "") sous surveillance")
+                    .foregroundStyle(Theme.muted)
+                    .padding(.bottom, 24)
+            }
+        }
+    }
+}
+
+/// Annonce courte au moment où la pause commence. Elle se ferme ; le compte à rebours reste.
+private struct PauseBanner: View {
+    let session: UnlockSession
+    let dismiss: () -> Void
+    @EnvironmentObject var store: RulesStore
+    var body: some View {
+        Card {
+            HStack(spacing: 14) {
+                BlobView(mood: .happy, size: 54, glow: false, float: false)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("C'est parti").font(.system(size: 16, weight: .bold, design: .rounded))
+                    Text("\(session.items.map(store.name(for:)).joined(separator: ", ")) · \(Int(session.end.timeIntervalSince(session.start) / 60)) min accordées")
+                        .font(.callout).foregroundStyle(Theme.muted)
+                }
+                Spacer()
+                PillButton(title: "OK", icon: "checkmark", action: dismiss)
+            }
+        }
+    }
+}
+
+/// Compte à rebours d'une pause : temps restant, durée accordée, heure de fin. Ne bloque pas l'écran.
+private struct PauseClock: View {
+    let session: UnlockSession
+    @EnvironmentObject var store: RulesStore
+
+    var body: some View {
+        let total = max(1, session.end.timeIntervalSince(session.start))
+        let left = max(0, session.end.timeIntervalSince(store.now))
+        let fraction = left / total
+        ZStack {
+            RoundedRectangle(cornerRadius: 32).fill(Theme.card)
+            RadialGradient(colors: [Mood.happy.center.opacity(0.22), .clear],
+                           center: .center, startRadius: 10, endRadius: 280)
+                .clipShape(RoundedRectangle(cornerRadius: 32))
+            HStack(spacing: 28) {
+                ZStack {
+                    Circle().stroke(Color.white.opacity(0.08), lineWidth: 12)
+                    Circle()
+                        .trim(from: 0, to: fraction)
+                        .stroke(Theme.accent, style: StrokeStyle(lineWidth: 12, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .animation(.linear(duration: 1), value: fraction)
+                    VStack(spacing: 2) {
+                        Text(clock(left))
+                            .font(.system(size: 28, weight: .bold, design: .rounded).monospacedDigit())
+                        Text("restant").font(.caption).foregroundStyle(Theme.muted)
+                    }
+                }
+                .frame(width: 150, height: 150)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(session.items.map(store.name(for:)).joined(separator: ", "))
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                    Text("\(Int(total / 60)) min accordées · jusqu'à \(session.end.formatted(date: .omitted, time: .shortened))")
+                        .foregroundStyle(Theme.muted)
+                    Text(session.reason).font(.callout).foregroundStyle(.white.opacity(0.8)).lineLimit(2)
+                    PillButton(title: "Re-bloquer maintenant", icon: "lock.fill", style: .danger) {
+                        store.endSession(session)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(24)
+        }
+    }
+
+    private func clock(_ seconds: TimeInterval) -> String {
+        let t = Int(seconds)
+        if t >= 3600 { return String(format: "%d:%02d:%02d", t / 3600, (t % 3600) / 60, t % 60) }
+        return String(format: "%d:%02d", t / 60, t % 60)
     }
 }
 

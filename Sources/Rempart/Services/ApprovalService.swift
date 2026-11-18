@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import SQLite3
+import UserNotifications
 
 /// Envoie les demandes via l'app Messages (iMessage / SMS) et lit les réponses
 /// (OUI / OUI15 / NON) dans la conversation.
@@ -47,7 +48,9 @@ final class ApprovalService: ObservableObject {
         switch decision {
         case "approve": store.resolveRequest(r.id, status: .approved, grantedMinutes: r.minutes)
         case "approve15": store.resolveRequest(r.id, status: .approved, grantedMinutes: min(15, r.minutes))
-        case "deny": store.resolveRequest(r.id, status: .denied)
+        case "deny":
+            store.resolveRequest(r.id, status: .denied)
+            PauseNotifier.refused(by: r.contactName)
         default: break
         }
     }
@@ -69,28 +72,23 @@ final class ApprovalService: ObservableObject {
         let store = RulesStore.shared
         let names = items.map(store.name(for:)).joined(separator: ", ")
         let who = NSFullUserName().isEmpty ? "Quelqu'un" : NSFullUserName()
+        let first = who.split(separator: " ").first.map(String.init) ?? who
         let duration = Self.format(minutes)
+        let reply = minutes > 15
+            ? "Réponds OUI pour accepter, OUI15 pour 15 min seulement, ou NON."
+            : "Réponds juste OUI ou NON."
         let body = """
-        Rempart — demande de déblocage
-        De : \(who)
-        Veut utiliser : \(names)
-        Durée : \(duration)
+        Salut ! \(first) aimerait utiliser \(names) pendant \(duration).
 
         « \(message) »
 
-        Réponds par un seul mot :
-        • OUI — pour approuver (\(duration))
-        • OUI15 — pour 15 minutes seulement
-        • NON — pour refuser
+        \(reply)
         """
-        let token = (0..<8).map { _ in "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".randomElement()! }
-        let marker = String(token)
-        let full = body + "\n\n#\(marker)"
-        guard sendMessage(to: contact.handle, text: full) else { return false }
+        guard sendMessage(to: contact.handle, text: body) else { return false }
         store.addRequest(ApprovalRequest(
             contactName: contact.name, replyTopic: contact.handle, items: items,
             minutes: minutes, message: message, created: Date(),
-            status: .pending, grantedMinutes: nil, marker: marker
+            status: .pending, grantedMinutes: nil, marker: nil
         ))
         refreshTimer()
         return true
@@ -243,5 +241,43 @@ final class ApprovalService: ObservableObject {
             if t == "NON" || t == "NO" { return "deny" }
             return nil
         }
+    }
+}
+
+/// Notifications locales : la pause ne vole pas le focus, elle prévient dans le Centre de notifications.
+@MainActor
+enum PauseNotifier {
+    static func askPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    static func started(names: String, minutes: Int, by: String?) {
+        let who = by.map { "\($0) t'accorde " } ?? ""
+        deliver(id: "pause-start", title: "Pause commencée",
+                body: "\(who)\(ApprovalService.format(minutes)) pour \(names).")
+    }
+
+    static func endingSoon(names: String) {
+        deliver(id: "pause-soon", title: "Plus qu'une minute",
+                body: "\(names) se rebloque dans une minute.")
+    }
+
+    static func ended(names: String) {
+        deliver(id: "pause-end", title: "Pause terminée",
+                body: "\(names) est de nouveau bloqué.")
+    }
+
+    static func refused(by: String) {
+        deliver(id: "pause-no", title: "Demande refusée",
+                body: "\(by) a répondu NON.")
+    }
+
+    private static func deliver(id: String, title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        let req = UNNotificationRequest(identifier: id + UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(req)
     }
 }

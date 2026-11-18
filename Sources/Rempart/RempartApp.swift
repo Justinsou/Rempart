@@ -64,6 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             AppBlocker.shared.start()
             WebBlocker.shared.start()
             ApprovalService.shared.start()
+            PauseNotifier.askPermission()
             for w in NSApp.windows where w.identifier?.rawValue.contains("main") == true {
                 WindowKeepAlive.shared.watch(w)
             }
@@ -78,6 +79,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag { MainActor.assumeIsolated { AppRouter.shared.showMain(tab: AppRouter.shared.tab) } }
         return true
+    }
+}
+
+extension RempartApp {
+    /// Compte à rebours court pour la barre de menus.
+    static func remaining(_ s: UnlockSession, now: Date) -> String {
+        let t = max(0, Int(s.end.timeIntervalSince(now)))
+        if t >= 3600 { return String(format: "%d:%02d:%02d", t / 3600, (t % 3600) / 60, t % 60) }
+        return String(format: "%d:%02d", t / 60, t % 60)
     }
 }
 
@@ -109,9 +119,15 @@ struct RempartApp: App {
             }
         }
 
-        MenuBarExtra("Rempart", systemImage: "shield.lefthalf.filled") {
+        MenuBarExtra {
             MenuBarContent()
                 .environmentObject(store)
+        } label: {
+            if let s = store.activeSessions.first {
+                Text(Self.remaining(s, now: store.now))
+            } else {
+                Image(systemName: "shield.lefthalf.filled")
+            }
         }
     }
 }
@@ -119,8 +135,14 @@ struct RempartApp: App {
 struct MenuBarContent: View {
     @EnvironmentObject var store: RulesStore
     var body: some View {
-        let n = store.activeSessions.count
-        Text(n == 0 ? "Protégé" : "\(n) déblocage\(n > 1 ? "s" : "") en cours")
+        if store.activeSessions.isEmpty {
+            Text("Protégé")
+        } else {
+            Text("Pauses en cours")
+            ForEach(store.activeSessions) { s in
+                Text("\(s.items.map(store.name(for:)).joined(separator: ", ")) · \(RempartApp.remaining(s, now: store.now))")
+            }
+        }
         Divider()
         Button("Ouvrir Rempart") { AppRouter.shared.showMain(tab: .dashboard) }
         Button("Débloquer…") { AppRouter.shared.showMain(tab: .unlock) }
